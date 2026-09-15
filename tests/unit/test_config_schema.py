@@ -1,5 +1,6 @@
 import pytest
 from hand_gesture_recognition.configuration.schema import (
+    DatasetConfig,
     ExperimentConfig,
     WindowingConfig,
     validate_experiment_config,
@@ -49,3 +50,20 @@ def test_experiment_validation_rejects_bad_backend():
     cfg.backend = "neural"  # Phase 1 does not implement neural
     with pytest.raises(ConfigValidationError):
         validate_experiment_config(cfg)
+
+
+def test_validation_uses_configured_sampling_rate():
+    cfg = ExperimentConfig(
+        run_id="test",
+        backend="classical",
+        seed=42,
+        deterministic=False,
+        dataset=DatasetConfig(sampling_rate=100.0),
+        windowing=WindowingConfig(
+            window_size_samples=40, window_size_seconds=0.4, stride_samples=10
+        ),
+    )
+    # 0.4s * 100 Hz == 40 samples -> consistent ONLY at the configured 100 Hz;
+    # at a hardcoded 200 Hz it would be 80 samples and this must raise.
+    out = validate_experiment_config(cfg)
+    assert out.windowing.resolve(sampling_rate=100.0) == (40, 10)
