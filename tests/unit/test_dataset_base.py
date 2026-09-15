@@ -29,17 +29,23 @@ def test_dataset_n_trials_and_shapes():
     assert d.labels.tolist() == [0, 1]
 
 
-def test_hash_files_is_deterministic(tmp_path):
-    f = tmp_path / "a.txt"
-    f.write_text("hello")
-    h1 = hash_files([str(f)])
-    h2 = hash_files([str(f)])
+def test_hash_files_is_order_independent(tmp_path):
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("hello")
+    b.write_text("world")
+    h1 = hash_files([str(a), str(b)])
+    h2 = hash_files([str(b), str(a)])
     assert h1 == h2
     assert len(h1) == 64
 
 
-def test_hash_directory_ignores_filenames_but_sorts(tmp_path):
-    (tmp_path / "b.txt").write_text("1")
-    (tmp_path / "a.txt").write_text("2")
-    h = hash_directory(str(tmp_path))
-    assert isinstance(h, str) and len(h) == 64
+def test_hash_directory_is_location_independent(tmp_path):
+    dir1 = tmp_path / "d1"
+    dir2 = tmp_path / "d2"
+    dir1.mkdir()
+    dir2.mkdir()
+    for d in (dir1, dir2):
+        (d / "a.txt").write_text("1")
+        (d / "b.txt").write_text("2")
+    assert hash_directory(str(dir1)) == hash_directory(str(dir2))
