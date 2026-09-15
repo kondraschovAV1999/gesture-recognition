@@ -24,6 +24,21 @@ def test_subject_wise_split_has_no_leakage():
     assert total == ds.n_trials
 
 
+def test_subject_wise_split_never_empty_partitions():
+    ds = make_synthetic_dataset(n_subjects=3, n_trials_per_subject=3, seed=0)
+    cfg = SplitConfig(
+        strategy="subject_wise",
+        train_ratio=0.6,
+        val_ratio=0.2,
+        test_ratio=0.2,
+        seed=0,
+    )
+    split = split_dataset(ds, cfg)
+    assert split.train.n_trials > 0
+    assert split.val.n_trials > 0
+    assert split.test.n_trials > 0
+
+
 def test_random_split_preserves_count():
     ds = make_synthetic_dataset(n_subjects=4, n_trials_per_subject=5, seed=0)
     cfg = SplitConfig(

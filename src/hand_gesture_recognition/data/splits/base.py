@@ -33,6 +33,11 @@ def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:
     rng = np.random.default_rng(config.seed)
 
     if config.strategy in ("subject_wise", "session_wise"):
+        # Both strategies split on the group identity given by split_on
+        # (subject_ids by default). A true session-wise split needs a
+        # session-bearing field; for Phase-1 datasets without one (EPN612 /
+        # synthetic) this behaves like subject_wise. Group counts guarantee
+        # >=1 group per partition whenever the dataset has >=3 groups.
         groups = (
             dataset.subject_ids
             if config.split_on == "subject_ids"
@@ -40,15 +45,16 @@ def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:
         )
         unique = np.unique(groups)
         rng.shuffle(unique)
-        n_train = max(1, int(round(len(unique) * config.train_ratio)))
-        n_val = max(1, int(round(len(unique) * config.val_ratio)))
-        train_g, val_g, test_g = (
-            unique[:n_train],
-            unique[n_train : n_train + n_val],
-            unique[n_train + n_val :],
-        )
-        if len(test_g) == 0:
-            test_g = unique[n_train + n_val :]
+        n = len(unique)
+        n_val = max(1, int(round(n * config.val_ratio)))
+        n_test = max(1, int(round(n * config.test_ratio)))
+        n_train = max(1, n - n_val - n_test)
+        if n_train + n_val + n_test > n:  # ratios over-allocate for tiny n
+            n_val = max(1, (n - n_train) // 2)
+            n_test = n - n_train - n_val
+        train_g = unique[:n_train]
+        val_g = unique[n_train : n_train + n_val]
+        test_g = unique[n_train + n_val : n_train + n_val + n_test]
         train_idx = np.where(np.isin(groups, train_g))[0]
         val_idx = np.where(np.isin(groups, val_g))[0]
         test_idx = np.where(np.isin(groups, test_g))[0]
