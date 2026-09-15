@@ -12,20 +12,20 @@
 
 - Python **3.10** (conda env `hand-gesture-recognition` is already created and active).
 - Package manager: **pip** with `pyproject.toml` (setuptools). No poetry/uv.
-- Import root: **`src/ml_framework/`** as a single top-level package (see "Key decisions" below for why this deviates from the spec's flat `src/data`, `src/logging`, … tree).
-- Windowing must have **exactly one** implementation (`ml_framework/data/windowing/`), imported by nothing that depends on sklearn or Lightning.
+- Import root: **`src/hand_gesture_recognition/`** as a single top-level package (see "Key decisions" below for why this deviates from the spec's flat `src/data`, `src/logging`, … tree).
+- Windowing must have **exactly one** implementation (`hand_gesture_recognition/data/windowing/`), imported by nothing that depends on sklearn or Lightning.
 - **Split-before-window** ordering is a hard rule; subject/session leakage is tested, not just assumed.
-- The **Configuration Loading Module** (`ml_framework/configuration/loader.py`) is the *only* module allowed to call `hydra.compose` / `OmegaConf.load` for config resolution. Every other component receives a validated `ExperimentConfig` dataclass.
+- The **Configuration Loading Module** (`hand_gesture_recognition/configuration/loader.py`) is the *only* module allowed to call `hydra.compose` / `OmegaConf.load` for config resolution. Every other component receives a validated `ExperimentConfig` dataclass.
 - Evaluation accepts **only** `Prediction` objects — never raw sklearn/Lightning output.
 - Every `_target_`-instantiated pluggable component is constructed via `hydra.utils.instantiate` in the runner, never hardcoded dispatch.
 - No hidden defaults that affect research results: every default lives in the structured config schema and is recorded in the resolved config.
 - `output/` is git-ignored; the raw EPN612 dataset under `resources/data/EPN612/` is git-ignored too (content-hash, not bytes-in-git, is the reproducibility anchor).
 - All generated artifacts are grouped under `output/<kind>/<run_id>/`.
-- **Windows shell caveat:** the execution shell wraps commands via `conda run cmd.exe /c`, which strips double quotes from inline `python -c "..."` arguments (splitting on spaces). Implementers must NOT use inline `python -c` with quoted code; write a temporary script file or use `pytest`/`python -m` instead.
+- **Windows shell caveat:** the execution shell wraps commands via `conda run cmd.exe /c`, which strips double quotes and splits on spaces. Therefore: (a) do NOT use inline `python -c "..."` with quoted code — write a temporary script file or use `pytest`/`python -m`; (b) do NOT use `git commit -m "multi word message"` — use a single-token hyphenated message (`git commit -m feat-config-schema`) or a message file (`git commit -F <file>`); (c) do NOT put filesystem paths in Hydra overrides — set them on the typed config object in code instead.
 
 ## Key Decisions (deviations from spec, documented)
 
-1. **Single top-level package `ml_framework`.** The spec's tree puts generic modules (`data/`, `logging/`, `tracing/`, `runner/`) directly under `src/`. Importing `logging` as a top-level module would shadow the Python stdlib `logging`, and `data`/`runner`/`tracking` are collision-prone generic names. We place everything under `src/ml_framework/` (→ `ml_framework.data`, `ml_framework.configuration`, `ml_framework.logging`, …), preserving every submodule name and responsibility from the spec while making the codebase a proper installable package. This is a strong technical reason to amend ADR-style item "project structure" from Section 4.
+1. **Single top-level package `hand_gesture_recognition`.** The spec's tree puts generic modules (`data/`, `logging/`, `tracing/`, `runner/`) directly under `src/`. Importing `logging` as a top-level module would shadow the Python stdlib `logging`, and `data`/`runner`/`tracking` are collision-prone generic names. We place everything under `src/hand_gesture_recognition/` (→ `hand_gesture_recognition.data`, `hand_gesture_recognition.configuration`, `hand_gesture_recognition.logging`, …), preserving every submodule name and responsibility from the spec while making the codebase a proper installable package. This is a strong technical reason to amend ADR-style item "project structure" from Section 4.
 2. **Dataclasses + ConfigStore (not Pydantic)** for structured configs. Phase 1's validation needs are narrow (windowing sample/time consistency, split ratios, enum-like fields); a small hand-written validator on dataclasses keeps deps minimal and stays idiomatic to Hydra. Pydantic can be introduced later if schema complexity grows.
 3. **Pluggable component configs are `DictConfig`s carrying `_target_`.** Preprocessing steps, feature extractors, and the model are represented as nested config nodes with a `_target_` key. The strongly-typed dataclass layer covers the fields that need real validation (dataset, split, windowing, seed, backend, tracking/reporting). This is the standard Hydra `instantiate` idiom and keeps the schema focused.
 4. **First dataset loader = EPN612** (real data), plus a tiny synthetic fixture builder for tests (so correctness tests never depend on 612 JSON files being present).
@@ -40,7 +40,7 @@ hand-gesture-recognition/            # git repo root (git init here)
 ├── docs/
 │   ├── ml_research_framework_spec_v3.md   # spec moved here
 │   └── superpowers/plans/2026-09-13-phase1-foundation.md
-├── src/ml_framework/
+├── src/hand_gesture_recognition/
 │   ├── __init__.py
 │   ├── configuration/
 │   │   ├── __init__.py
@@ -128,14 +128,14 @@ hand-gesture-recognition/            # git repo root (git init here)
 **Files:**
 - Create: `pyproject.toml`
 - Create: `.gitignore`
-- Create: `src/ml_framework/__init__.py`
+- Create: `src/hand_gesture_recognition/__init__.py`
 - Create: `tests/__init__.py`, `tests/unit/__init__.py`
 - Move: `ml_research_framework_spec_v3.md` → `docs/ml_research_framework_spec_v3.md`
 - Modify: nothing else (new repo)
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: importable package `ml_framework` (version `0.1.0`); installed deps; git repo.
+- Produces: importable package `hand_gesture_recognition` (version `0.1.0`); installed deps; git repo.
 
 - [ ] **Step 1: `git init` and move the spec**
 
@@ -154,7 +154,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ml-framework"
+name = "hand-gesture-recognition"
 version = "0.1.0"
 description = "Reusable research/benchmarking framework for time-series and tabular ML experiments"
 requires-python = ">=3.10"
@@ -207,7 +207,7 @@ mlruns/
 
 - [ ] **Step 4: Write package `__init__.py` files**
 
-Create `src/ml_framework/__init__.py`:
+Create `src/hand_gesture_recognition/__init__.py`:
 
 ```python
 __version__ = "0.1.0"
@@ -222,26 +222,26 @@ pip install -e .
 pip install pytest
 ```
 
-Expected: installs `ml-framework 0.1.0`, hydra-core, scikit-learn, numpy, pandas, mlflow, matplotlib, pytest.
+Expected: installs `hand-gesture-recognition 0.1.0`, hydra-core, scikit-learn, numpy, pandas, mlflow, matplotlib, pytest.
 
 - [ ] **Step 6: Verify the package imports and commit**
 
 ```bash
-pip show ml-framework pytest
+pip show hand-gesture-recognition pytest
 git add -A
 git commit -m "chore: scaffold package, pyproject, and gitignore"
 ```
 
-Expected output: `pip show` lists `ml-framework` version `0.1.0` and `pytest`.
+Expected output: `pip show` lists `hand-gesture-recognition` version `0.1.0` and `pytest`.
 
 ---
 
 ### Task 1: Structured configuration schema (dataclasses + validation)
 
 **Files:**
-- Create: `src/ml_framework/configuration/__init__.py`
-- Create: `src/ml_framework/configuration/errors.py`
-- Create: `src/ml_framework/configuration/schema.py`
+- Create: `src/hand_gesture_recognition/configuration/__init__.py`
+- Create: `src/hand_gesture_recognition/configuration/errors.py`
+- Create: `src/hand_gesture_recognition/configuration/schema.py`
 - Test: `tests/unit/test_config_schema.py`
 
 **Interfaces:**
@@ -258,12 +258,12 @@ Expected output: `pip show` lists `ml-framework` version `0.1.0` and `pytest`.
 
 ```python
 import pytest
-from ml_framework.configuration.schema import (
+from hand_gesture_recognition.configuration.schema import (
     ExperimentConfig,
     WindowingConfig,
     validate_experiment_config,
 )
-from ml_framework.configuration.errors import ConfigValidationError
+from hand_gesture_recognition.configuration.errors import ConfigValidationError
 
 
 def _base_experiment() -> ExperimentConfig:
@@ -311,7 +311,7 @@ def test_experiment_validation_rejects_bad_backend():
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/unit/test_config_schema.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'ml_framework.configuration'`.
+Expected: FAIL — `ModuleNotFoundError: No module named 'hand_gesture_recognition.configuration'`.
 
 - [ ] **Step 3: Write `errors.py`**
 
@@ -336,7 +336,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from ml_framework.configuration.errors import ConfigValidationError
+from hand_gesture_recognition.configuration.errors import ConfigValidationError
 
 SCHEMA_VERSION = "1.0"
 SUPPORTED_BACKENDS = ("classical",)  # neural arrives in Phase 2
@@ -401,7 +401,7 @@ class DatasetConfig:
     path: str = "resources/data/EPN612"
     sampling_rate: float = 200.0
     loader: Dict[str, Any] = field(
-        default_factory=lambda: {"_target_": "ml_framework.data.loaders.epn612.EPN612Loader"}
+        default_factory=lambda: {"_target_": "hand_gesture_recognition.data.loaders.epn612.EPN612Loader"}
     )
 
 
@@ -432,7 +432,7 @@ class ClassicalConfig:
     features: List[Dict[str, Any]] = field(default_factory=list)
     model: Dict[str, Any] = field(
         default_factory=lambda: {
-            "_target_": "ml_framework.classical.models.random_forest.RandomForestEstimator",
+            "_target_": "hand_gesture_recognition.classical.models.random_forest.RandomForestEstimator",
             "n_estimators": 100,
             "random_state": 42,
         }
@@ -456,7 +456,7 @@ class AnalyticsConfig:
 @dataclass
 class TrackingConfig:
     tracking_uri: str = "mlruns"
-    experiment_name: str = "ml_framework"
+    experiment_name: str = "hand_gesture_recognition"
 
 
 @dataclass
@@ -515,10 +515,10 @@ git commit -m "feat(config): structured config schema with cross-field validatio
 ### Task 2: Dataset representation and content hashing
 
 **Files:**
-- Create: `src/ml_framework/data/__init__.py`
-- Create: `src/ml_framework/data/hashing.py`
-- Create: `src/ml_framework/data/datasets/__init__.py`
-- Create: `src/ml_framework/data/datasets/base.py`
+- Create: `src/hand_gesture_recognition/data/__init__.py`
+- Create: `src/hand_gesture_recognition/data/hashing.py`
+- Create: `src/hand_gesture_recognition/data/datasets/__init__.py`
+- Create: `src/hand_gesture_recognition/data/datasets/base.py`
 - Test: `tests/unit/test_dataset_base.py`
 
 **Interfaces:**
@@ -535,8 +535,8 @@ git commit -m "feat(config): structured config schema with cross-field validatio
 ```python
 import numpy as np
 
-from ml_framework.data.datasets.base import Dataset, DatasetMetadata
-from ml_framework.data.hashing import hash_files, hash_directory
+from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
+from hand_gesture_recognition.data.hashing import hash_files, hash_directory
 
 
 def _meta() -> DatasetMetadata:
@@ -669,10 +669,10 @@ git commit -m "feat(data): Dataset/DatasetMetadata types and content hashing"
 ### Task 3: EPN612 loader and synthetic fixture
 
 **Files:**
-- Create: `src/ml_framework/data/loaders/__init__.py`
-- Create: `src/ml_framework/data/loaders/base.py`
-- Create: `src/ml_framework/data/loaders/epn612.py`
-- Create: `src/ml_framework/data/fixtures.py`
+- Create: `src/hand_gesture_recognition/data/loaders/__init__.py`
+- Create: `src/hand_gesture_recognition/data/loaders/base.py`
+- Create: `src/hand_gesture_recognition/data/loaders/epn612.py`
+- Create: `src/hand_gesture_recognition/data/fixtures.py`
 - Test: `tests/unit/test_epn612_loader.py`
 
 **Interfaces:**
@@ -691,7 +691,7 @@ import json
 
 import numpy as np
 
-from ml_framework.data.loaders.epn612 import EPN612Loader
+from hand_gesture_recognition.data.loaders.epn612 import EPN612Loader
 
 
 def _write_user(root, subdir, user_id, n_samples=3, length=50):
@@ -749,14 +749,14 @@ Expected: FAIL — `ModuleNotFoundError`.
 
 - [ ] **Step 3: Write `loaders/base.py` and `fixtures.py`**
 
-`src/ml_framework/data/loaders/base.py`:
+`src/hand_gesture_recognition/data/loaders/base.py`:
 
 ```python
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ml_framework.data.datasets.base import Dataset
+from hand_gesture_recognition.data.datasets.base import Dataset
 
 
 class DatasetLoader(ABC):
@@ -766,7 +766,7 @@ class DatasetLoader(ABC):
         raise NotImplementedError
 ```
 
-`src/ml_framework/data/fixtures.py`:
+`src/hand_gesture_recognition/data/fixtures.py`:
 
 ```python
 from __future__ import annotations
@@ -775,7 +775,7 @@ from typing import List
 
 import numpy as np
 
-from ml_framework.data.datasets.base import Dataset, DatasetMetadata
+from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
 
 
 def make_synthetic_dataset(
@@ -829,9 +829,9 @@ from typing import Dict, Iterable, List, Optional
 
 import numpy as np
 
-from ml_framework.data.datasets.base import Dataset, DatasetMetadata
-from ml_framework.data.hashing import hash_directory
-from ml_framework.data.loaders.base import DatasetLoader
+from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
+from hand_gesture_recognition.data.hashing import hash_directory
+from hand_gesture_recognition.data.loaders.base import DatasetLoader
 
 GESTURE_LABELS = {
     "noGesture": 0, "fist": 1, "waveIn": 2, "waveOut": 3, "open": 4, "pinch": 5,
@@ -926,8 +926,8 @@ git commit -m "feat(data): EPN612 JSON loader and synthetic fixture"
 ### Task 4: Split strategies and leakage check
 
 **Files:**
-- Create: `src/ml_framework/data/splits/__init__.py`
-- Create: `src/ml_framework/data/splits/base.py`
+- Create: `src/hand_gesture_recognition/data/splits/__init__.py`
+- Create: `src/hand_gesture_recognition/data/splits/base.py`
 - Test: `tests/unit/test_splits.py`
 
 **Interfaces:**
@@ -944,9 +944,9 @@ git commit -m "feat(data): EPN612 JSON loader and synthetic fixture"
 ```python
 import pytest
 
-from ml_framework.configuration.schema import SplitConfig
-from ml_framework.data.fixtures import make_synthetic_dataset
-from ml_framework.data.splits.base import assert_no_group_leakage, split_dataset
+from hand_gesture_recognition.configuration.schema import SplitConfig
+from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
+from hand_gesture_recognition.data.splits.base import assert_no_group_leakage, split_dataset
 
 
 def test_subject_wise_split_has_no_leakage():
@@ -991,9 +991,9 @@ from typing import List
 
 import numpy as np
 
-from ml_framework.configuration.errors import ConfigValidationError
-from ml_framework.configuration.schema import SplitConfig
-from ml_framework.data.datasets.base import Dataset
+from hand_gesture_recognition.configuration.errors import ConfigValidationError
+from hand_gesture_recognition.configuration.schema import SplitConfig
+from hand_gesture_recognition.data.datasets.base import Dataset
 
 
 @dataclass
@@ -1093,8 +1093,8 @@ git commit -m "feat(data): split strategies with subject/session leakage check"
 ### Task 5: Shared windowing (backend-agnostic)
 
 **Files:**
-- Create: `src/ml_framework/data/windowing/__init__.py`
-- Create: `src/ml_framework/data/windowing/base.py`
+- Create: `src/hand_gesture_recognition/data/windowing/__init__.py`
+- Create: `src/hand_gesture_recognition/data/windowing/base.py`
 - Test: `tests/unit/test_windowing.py`
 
 **Interfaces:**
@@ -1111,9 +1111,9 @@ git commit -m "feat(data): split strategies with subject/session leakage check"
 ```python
 import numpy as np
 
-from ml_framework.configuration.schema import WindowingConfig
-from ml_framework.data.datasets.base import Dataset, DatasetMetadata
-from ml_framework.data.windowing.base import window_dataset
+from hand_gesture_recognition.configuration.schema import WindowingConfig
+from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
+from hand_gesture_recognition.data.windowing.base import window_dataset
 
 
 def _ds(lengths=(100, 60), labels=(0, 1), subjects=("s1", "s2")):
@@ -1171,8 +1171,8 @@ from typing import List
 
 import numpy as np
 
-from ml_framework.configuration.schema import WindowingConfig
-from ml_framework.data.datasets.base import Dataset
+from hand_gesture_recognition.configuration.schema import WindowingConfig
+from hand_gesture_recognition.data.datasets.base import Dataset
 
 
 @dataclass
@@ -1250,7 +1250,7 @@ git commit -m "feat(data): shared backend-agnostic windowing"
 ### Task 6: Configuration Loading Module (compose + replay + validate)
 
 **Files:**
-- Create: `src/ml_framework/configuration/loader.py`
+- Create: `src/hand_gesture_recognition/configuration/loader.py`
 - Test: `tests/unit/test_config_loader.py`
 
 **Interfaces:**
@@ -1266,8 +1266,8 @@ git commit -m "feat(data): shared backend-agnostic windowing"
 ```python
 import pytest
 
-from ml_framework.configuration.errors import ConfigValidationError, ConfigReplayError
-from ml_framework.configuration.loader import load_config, save_resolved_config
+from hand_gesture_recognition.configuration.errors import ConfigValidationError, ConfigReplayError
+from hand_gesture_recognition.configuration.loader import load_config, save_resolved_config
 
 
 def test_compose_mode_returns_validated_config():
@@ -1321,8 +1321,8 @@ from typing import Any, Dict, List, Optional
 from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 
-from ml_framework.configuration.errors import ConfigReplayError, ConfigValidationError
-from ml_framework.configuration.schema import (
+from hand_gesture_recognition.configuration.errors import ConfigReplayError, ConfigValidationError
+from hand_gesture_recognition.configuration.schema import (
     AnalyticsConfig,
     ClassicalConfig,
     DatasetConfig,
@@ -1440,7 +1440,7 @@ name: epn612
 path: resources/data/EPN612
 sampling_rate: 200
 loader:
-  _target_: ml_framework.data.loaders.epn612.EPN612Loader
+  _target_: hand_gesture_recognition.data.loaders.epn612.EPN612Loader
 ```
 
 `configs/split/subject_wise.yaml`:
@@ -1474,11 +1474,11 @@ padding: none
 ```yaml
 # @package classical
 features:
-  - _target_: ml_framework.features.time_domain.TimeDomainFeatures
+  - _target_: hand_gesture_recognition.features.time_domain.TimeDomainFeatures
 preprocessing:
   - _target_: sklearn.preprocessing.StandardScaler
 model:
-  _target_: ml_framework.classical.models.random_forest.RandomForestEstimator
+  _target_: hand_gesture_recognition.classical.models.random_forest.RandomForestEstimator
   n_estimators: 100
   random_state: 42
 ```
@@ -1508,7 +1508,7 @@ seed: 42
 deterministic: false
 tracking:
   tracking_uri: mlruns
-  experiment_name: ml_framework
+  experiment_name: hand_gesture_recognition
 reporting:
   formats: [json, html]
 ```
@@ -1530,9 +1530,9 @@ git commit -m "feat(config): compose/replay Configuration Loading Module"
 ### Task 7: Analytics (statistics, QC checks)
 
 **Files:**
-- Create: `src/ml_framework/analytics/__init__.py`
-- Create: `src/ml_framework/analytics/stats.py`
-- Create: `src/ml_framework/analytics/qc.py`
+- Create: `src/hand_gesture_recognition/analytics/__init__.py`
+- Create: `src/hand_gesture_recognition/analytics/stats.py`
+- Create: `src/hand_gesture_recognition/analytics/qc.py`
 - Test: `tests/unit/test_analytics.py`
 
 **Interfaces:**
@@ -1548,9 +1548,9 @@ git commit -m "feat(config): compose/replay Configuration Loading Module"
 ```python
 import numpy as np
 
-from ml_framework.analytics.qc import run_quality_checks
-from ml_framework.analytics.stats import dataset_summary
-from ml_framework.data.datasets.base import Dataset, DatasetMetadata
+from hand_gesture_recognition.analytics.qc import run_quality_checks
+from hand_gesture_recognition.analytics.stats import dataset_summary
+from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
 
 
 def _ds():
@@ -1589,7 +1589,7 @@ Expected: FAIL — `ModuleNotFoundError`.
 
 - [ ] **Step 3: Write `stats.py` and `qc.py`**
 
-`src/ml_framework/analytics/stats.py`:
+`src/hand_gesture_recognition/analytics/stats.py`:
 
 ```python
 from __future__ import annotations
@@ -1599,7 +1599,7 @@ from typing import Any, Dict
 
 import numpy as np
 
-from ml_framework.data.datasets.base import Dataset
+from hand_gesture_recognition.data.datasets.base import Dataset
 
 
 def dataset_summary(dataset: Dataset) -> Dict[str, Any]:
@@ -1628,7 +1628,7 @@ def dataset_summary(dataset: Dataset) -> Dict[str, Any]:
     }
 ```
 
-`src/ml_framework/analytics/qc.py`:
+`src/hand_gesture_recognition/analytics/qc.py`:
 
 ```python
 from __future__ import annotations
@@ -1637,7 +1637,7 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from ml_framework.data.datasets.base import Dataset
+from hand_gesture_recognition.data.datasets.base import Dataset
 
 
 def run_quality_checks(dataset: Dataset) -> List[Dict[str, Any]]:
@@ -1676,11 +1676,11 @@ git commit -m "feat(analytics): dataset statistics and quality-control checks"
 ### Task 8: Prediction object and classical adapter
 
 **Files:**
-- Create: `src/ml_framework/prediction/__init__.py`
-- Create: `src/ml_framework/prediction/base.py`
-- Create: `src/ml_framework/classical/__init__.py`
-- Create: `src/ml_framework/classical/adapters/__init__.py`
-- Create: `src/ml_framework/classical/adapters/sklearn.py`
+- Create: `src/hand_gesture_recognition/prediction/__init__.py`
+- Create: `src/hand_gesture_recognition/prediction/base.py`
+- Create: `src/hand_gesture_recognition/classical/__init__.py`
+- Create: `src/hand_gesture_recognition/classical/adapters/__init__.py`
+- Create: `src/hand_gesture_recognition/classical/adapters/sklearn.py`
 - Test: `tests/unit/test_prediction.py`
 
 **Interfaces:**
@@ -1697,8 +1697,8 @@ git commit -m "feat(analytics): dataset statistics and quality-control checks"
 ```python
 import numpy as np
 
-from ml_framework.classical.adapters.sklearn import SklearnPredictionAdapter
-from ml_framework.data.windowing.base import WindowMetadata, WindowedDataset
+from hand_gesture_recognition.classical.adapters.sklearn import SklearnPredictionAdapter
+from hand_gesture_recognition.data.windowing.base import WindowMetadata, WindowedDataset
 
 
 def _windowed(n=10):
@@ -1775,8 +1775,8 @@ from typing import Optional
 
 import numpy as np
 
-from ml_framework.data.windowing.base import WindowedDataset
-from ml_framework.prediction.base import Prediction, PredictionAdapter
+from hand_gesture_recognition.data.windowing.base import WindowedDataset
+from hand_gesture_recognition.prediction.base import Prediction, PredictionAdapter
 
 
 class SklearnPredictionAdapter(PredictionAdapter):
@@ -1816,8 +1816,8 @@ git commit -m "feat(prediction): Prediction dataclass and sklearn adapter"
 ### Task 9: Evaluation layer
 
 **Files:**
-- Create: `src/ml_framework/evaluation/__init__.py`
-- Create: `src/ml_framework/evaluation/base.py`
+- Create: `src/hand_gesture_recognition/evaluation/__init__.py`
+- Create: `src/hand_gesture_recognition/evaluation/base.py`
 - Test: `tests/unit/test_evaluation.py`
 
 **Interfaces:**
@@ -1833,9 +1833,9 @@ git commit -m "feat(prediction): Prediction dataclass and sklearn adapter"
 ```python
 import numpy as np
 
-from ml_framework.configuration.schema import EvaluationConfig
-from ml_framework.evaluation.base import evaluate
-from ml_framework.prediction.base import Prediction
+from hand_gesture_recognition.configuration.schema import EvaluationConfig
+from hand_gesture_recognition.evaluation.base import evaluate
+from hand_gesture_recognition.prediction.base import Prediction
 
 
 def _pred():
@@ -1878,8 +1878,8 @@ from sklearn.metrics import (
     f1_score,
 )
 
-from ml_framework.configuration.schema import EvaluationConfig
-from ml_framework.prediction.base import Prediction
+from hand_gesture_recognition.configuration.schema import EvaluationConfig
+from hand_gesture_recognition.prediction.base import Prediction
 
 _METRIC_FNS = {
     "accuracy": lambda yt, yp, **k: accuracy_score(yt, yp),
@@ -1941,12 +1941,12 @@ git commit -m "feat(evaluation): backend-independent EvaluationResult and metric
 ### Task 10: Classical pipeline (windowing transformer, features, model)
 
 **Files:**
-- Create: `src/ml_framework/classical/pipelines/__init__.py`
-- Create: `src/ml_framework/classical/pipelines/windowing.py`
-- Create: `src/ml_framework/classical/models/__init__.py`
-- Create: `src/ml_framework/classical/models/random_forest.py`
-- Create: `src/ml_framework/features/__init__.py`
-- Create: `src/ml_framework/features/time_domain.py`
+- Create: `src/hand_gesture_recognition/classical/pipelines/__init__.py`
+- Create: `src/hand_gesture_recognition/classical/pipelines/windowing.py`
+- Create: `src/hand_gesture_recognition/classical/models/__init__.py`
+- Create: `src/hand_gesture_recognition/classical/models/random_forest.py`
+- Create: `src/hand_gesture_recognition/features/__init__.py`
+- Create: `src/hand_gesture_recognition/features/time_domain.py`
 - Test: `tests/unit/test_classical_pipeline.py`
 
 **Interfaces:**
@@ -1964,11 +1964,11 @@ git commit -m "feat(evaluation): backend-independent EvaluationResult and metric
 import numpy as np
 from sklearn.pipeline import Pipeline
 
-from ml_framework.classical.models.random_forest import RandomForestEstimator
-from ml_framework.classical.pipelines.windowing import WindowingTransformer
-from ml_framework.configuration.schema import WindowingConfig
-from ml_framework.data.fixtures import make_synthetic_dataset
-from ml_framework.features.time_domain import TimeDomainFeatures
+from hand_gesture_recognition.classical.models.random_forest import RandomForestEstimator
+from hand_gesture_recognition.classical.pipelines.windowing import WindowingTransformer
+from hand_gesture_recognition.configuration.schema import WindowingConfig
+from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
+from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
 
 
 def test_windowing_transformer_calls_shared_windowing():
@@ -2000,16 +2000,16 @@ Expected: FAIL — `ModuleNotFoundError`.
 
 - [ ] **Step 3: Write the transformers and model**
 
-`src/ml_framework/classical/pipelines/windowing.py`:
+`src/hand_gesture_recognition/classical/pipelines/windowing.py`:
 
 ```python
 from __future__ import annotations
 
 from sklearn.base import BaseEstimator, TransformerMixin
 
-from ml_framework.configuration.schema import WindowingConfig
-from ml_framework.data.datasets.base import Dataset
-from ml_framework.data.windowing.base import WindowedDataset, window_dataset
+from hand_gesture_recognition.configuration.schema import WindowingConfig
+from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.data.windowing.base import WindowedDataset, window_dataset
 
 
 class WindowingTransformer(BaseEstimator, TransformerMixin):
@@ -2028,7 +2028,7 @@ class WindowingTransformer(BaseEstimator, TransformerMixin):
         return self.transform(X)
 ```
 
-`src/ml_framework/features/time_domain.py`:
+`src/hand_gesture_recognition/features/time_domain.py`:
 
 ```python
 from __future__ import annotations
@@ -2052,7 +2052,7 @@ class TimeDomainFeatures(BaseEstimator, TransformerMixin):
         return np.concatenate([rms, mav, wl], axis=1)
 ```
 
-`src/ml_framework/classical/models/random_forest.py`:
+`src/hand_gesture_recognition/classical/models/random_forest.py`:
 
 ```python
 from __future__ import annotations
@@ -2081,12 +2081,12 @@ git commit -m "feat(classical): windowing transformer, time-domain features, RF 
 ### Task 11: Tracking (MLflow), logging, and tracing
 
 **Files:**
-- Create: `src/ml_framework/tracking/__init__.py`
-- Create: `src/ml_framework/tracking/mlflow_tracker.py`
-- Create: `src/ml_framework/logging_setup/__init__.py`
-- Create: `src/ml_framework/logging_setup/config.py`
-- Create: `src/ml_framework/tracing/__init__.py`
-- Create: `src/ml_framework/tracing/stage.py`
+- Create: `src/hand_gesture_recognition/tracking/__init__.py`
+- Create: `src/hand_gesture_recognition/tracking/mlflow_tracker.py`
+- Create: `src/hand_gesture_recognition/logging_setup/__init__.py`
+- Create: `src/hand_gesture_recognition/logging_setup/config.py`
+- Create: `src/hand_gesture_recognition/tracing/__init__.py`
+- Create: `src/hand_gesture_recognition/tracing/stage.py`
 - Test: `tests/unit/test_tracking.py`
 
 **Interfaces:**
@@ -2104,8 +2104,8 @@ git commit -m "feat(classical): windowing transformer, time-domain features, RF 
 import mlflow
 import pytest
 
-from ml_framework.configuration.schema import TrackingConfig
-from ml_framework.tracking.mlflow_tracker import MlflowTracker
+from hand_gesture_recognition.configuration.schema import TrackingConfig
+from hand_gesture_recognition.tracking.mlflow_tracker import MlflowTracker
 
 
 def test_tracker_logs_params_and_metrics(tmp_path):
@@ -2146,9 +2146,9 @@ from typing import Any, Dict, Optional
 
 import mlflow
 
-from ml_framework.configuration.schema import TrackingConfig
-from ml_framework.data.datasets.base import Dataset
-from ml_framework.evaluation.base import EvaluationResult
+from hand_gesture_recognition.configuration.schema import TrackingConfig
+from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.evaluation.base import EvaluationResult
 
 
 class MlflowTracker:
@@ -2188,7 +2188,7 @@ class MlflowTracker:
 
 - [ ] **Step 4: Write `logging_setup/config.py` and `tracing/stage.py`**
 
-`src/ml_framework/logging_setup/config.py`:
+`src/hand_gesture_recognition/logging_setup/config.py`:
 
 ```python
 from __future__ import annotations
@@ -2217,7 +2217,7 @@ def get_logger(name: str, run_id: Optional[str] = None, log_dir: str = "output/l
     return logger
 ```
 
-`src/ml_framework/tracing/stage.py`:
+`src/hand_gesture_recognition/tracing/stage.py`:
 
 ```python
 from __future__ import annotations
@@ -2259,8 +2259,8 @@ git commit -m "feat(tracking): MLflow tracker, centralized logging, stage tracin
 ### Task 12: Reporting (JSON + HTML)
 
 **Files:**
-- Create: `src/ml_framework/reporting/__init__.py`
-- Create: `src/ml_framework/reporting/reporters.py`
+- Create: `src/hand_gesture_recognition/reporting/__init__.py`
+- Create: `src/hand_gesture_recognition/reporting/reporters.py`
 - Test: `tests/unit/test_reporting.py`
 
 **Interfaces:**
@@ -2279,9 +2279,9 @@ import json
 
 import numpy as np
 
-from ml_framework.configuration.schema import ExperimentConfig
-from ml_framework.evaluation.base import EvaluationResult
-from ml_framework.reporting.reporters import JsonReporter, render_report
+from hand_gesture_recognition.configuration.schema import ExperimentConfig
+from hand_gesture_recognition.evaluation.base import EvaluationResult
+from hand_gesture_recognition.reporting.reporters import JsonReporter, render_report
 
 
 def test_render_report_serializable():
@@ -2320,9 +2320,9 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
-from ml_framework.configuration.schema import ExperimentConfig
-from ml_framework.data.datasets.base import Dataset
-from ml_framework.evaluation.base import EvaluationResult
+from hand_gesture_recognition.configuration.schema import ExperimentConfig
+from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.evaluation.base import EvaluationResult
 
 
 def render_report(
@@ -2386,9 +2386,9 @@ git commit -m "feat(reporting): JSON and HTML reporters"
 ### Task 13: Experiment Runner + end-to-end smoke test
 
 **Files:**
-- Create: `src/ml_framework/runner/__init__.py`
-- Create: `src/ml_framework/runner/run.py`
-- Create: `src/ml_framework/__main__.py`
+- Create: `src/hand_gesture_recognition/runner/__init__.py`
+- Create: `src/hand_gesture_recognition/runner/run.py`
+- Create: `src/hand_gesture_recognition/__main__.py`
 - Test: `tests/integration/test_smoke.py`
 
 **Interfaces:**
@@ -2404,8 +2404,8 @@ git commit -m "feat(reporting): JSON and HTML reporters"
 ```python
 import os
 
-from ml_framework.configuration.loader import load_config
-from ml_framework.runner.run import ExperimentRunner
+from hand_gesture_recognition.configuration.loader import load_config
+from hand_gesture_recognition.runner.run import ExperimentRunner
 
 
 def test_classical_smoke(tmp_path, monkeypatch):
@@ -2417,7 +2417,7 @@ def test_classical_smoke(tmp_path, monkeypatch):
     # filesystem paths are set directly on the typed config (avoids Hydra
     # override parsing of Windows backslash/colon path separators)
     cfg.tracking.tracking_uri = str(tmp_path / "mlruns")
-    monkeypatch.setenv("ML_FRAMEWORK_OUTPUT", str(tmp_path / "output"))
+    monkeypatch.setenv("HAND_GESTURE_RECOGNITION_OUTPUT", str(tmp_path / "output"))
     runner = ExperimentRunner(cfg)
     runner.run()
     out = tmp_path / "output"
@@ -2441,25 +2441,25 @@ import uuid
 
 from hydra.utils import instantiate
 
-from ml_framework.configuration.loader import save_resolved_config
-from ml_framework.configuration.schema import ExperimentConfig
-from ml_framework.classical.adapters.sklearn import SklearnPredictionAdapter
-from ml_framework.data.fixtures import make_synthetic_dataset
-from ml_framework.data.splits.base import assert_no_group_leakage, split_dataset
-from ml_framework.evaluation.base import evaluate
-from ml_framework.logging_setup.config import get_logger
-from ml_framework.reporting.reporters import HtmlReporter, JsonReporter, render_report
-from ml_framework.tracking.mlflow_tracker import MlflowTracker
-from ml_framework.tracing.stage import stage
+from hand_gesture_recognition.configuration.loader import save_resolved_config
+from hand_gesture_recognition.configuration.schema import ExperimentConfig
+from hand_gesture_recognition.classical.adapters.sklearn import SklearnPredictionAdapter
+from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
+from hand_gesture_recognition.data.splits.base import assert_no_group_leakage, split_dataset
+from hand_gesture_recognition.evaluation.base import evaluate
+from hand_gesture_recognition.logging_setup.config import get_logger
+from hand_gesture_recognition.reporting.reporters import HtmlReporter, JsonReporter, render_report
+from hand_gesture_recognition.tracking.mlflow_tracker import MlflowTracker
+from hand_gesture_recognition.tracing.stage import stage
 
-OUTPUT_ROOT = os.environ.get("ML_FRAMEWORK_OUTPUT", "output")
+OUTPUT_ROOT = os.environ.get("HAND_GESTURE_RECOGNITION_OUTPUT", "output")
 
 
 class ExperimentRunner:
     def __init__(self, cfg: ExperimentConfig):
         self.cfg = cfg
         self.cfg.run_id = cfg.run_id or f"{cfg.backend}-{uuid.uuid4().hex[:8]}"
-        self.logger = get_logger("ml_framework.runner", run_id=self.cfg.run_id)
+        self.logger = get_logger("hand_gesture_recognition.runner", run_id=self.cfg.run_id)
         self.tracker = MlflowTracker(cfg.tracking)
 
     def run(self) -> None:
@@ -2500,7 +2500,7 @@ class ExperimentRunner:
     def _analytics(self, dataset) -> None:
         if not self.cfg.analytics.enabled:
             return
-        from ml_framework.analytics.stats import dataset_summary
+        from hand_gesture_recognition.analytics.stats import dataset_summary
         import json
         d = os.path.join(OUTPUT_ROOT, "analytics", dataset.metadata.name)
         os.makedirs(d, exist_ok=True)
@@ -2508,7 +2508,7 @@ class ExperimentRunner:
             json.dump(dataset_summary(dataset), f, indent=2)
 
     def _train_and_predict(self, train, test):
-        from ml_framework.classical.pipelines.windowing import WindowingTransformer
+        from hand_gesture_recognition.classical.pipelines.windowing import WindowingTransformer
 
         # shared windowing via the spec-mandated sklearn wrapper (Section 6.2)
         windower = WindowingTransformer(self.cfg.windowing)
@@ -2555,15 +2555,15 @@ class ExperimentRunner:
             HtmlReporter().write(report, os.path.join(run_dir, "report.html"))
 ```
 
-`src/ml_framework/__main__.py`:
+`src/hand_gesture_recognition/__main__.py`:
 
 ```python
 from __future__ import annotations
 
 import argparse
 
-from ml_framework.configuration.loader import load_config
-from ml_framework.runner.run import ExperimentRunner
+from hand_gesture_recognition.configuration.loader import load_config
+from hand_gesture_recognition.runner.run import ExperimentRunner
 
 
 def main() -> None:
@@ -2589,7 +2589,7 @@ Expected: PASS (1 passed).
 
 ```bash
 pytest
-python -m ml_framework --mode compose "split.strategy=subject_wise"
+python -m hand_gesture_recognition --mode compose "split.strategy=subject_wise"
 ```
 
 Expected: full suite green; CLI run creates `output/evaluation/<run_id>/{config/resolved.yaml, report.json, report.html}` and an `mlruns/` entry with the dataset content hash.
