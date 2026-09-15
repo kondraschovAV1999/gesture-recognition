@@ -1,0 +1,3 @@
+# @package analytics
+enabled: true
+run_qc: true

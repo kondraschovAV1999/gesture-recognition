@@ -1,0 +1,3 @@
+# @package evaluation
+metrics: [accuracy, balanced_accuracy, macro_f1]
+average: macro

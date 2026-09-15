@@ -1,0 +1,9 @@
+# @package classical
+features:
+  - _target_: hand_gesture_recognition.features.time_domain.TimeDomainFeatures
+preprocessing:
+  - _target_: sklearn.preprocessing.StandardScaler
+model:
+  _target_: hand_gesture_recognition.classical.models.random_forest.RandomForestEstimator
+  n_estimators: 100
+  random_state: 42

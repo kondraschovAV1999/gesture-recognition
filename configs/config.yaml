@@ -1,0 +1,17 @@
+defaults:
+  - dataset: epn612
+  - split: subject_wise
+  - windowing: default
+  - classical: random_forest
+  - evaluation: basic
+  - analytics: basic
+  - experiment: default
+  - _self_
+
+hydra:
+  run:
+    dir: output/test_runs/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: output/test_runs
+  job:
+    chdir: false
