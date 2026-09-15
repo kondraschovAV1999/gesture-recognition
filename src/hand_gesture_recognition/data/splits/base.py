@@ -1,0 +1,107 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List
+
+import numpy as np
+
+from hand_gesture_recognition.configuration.errors import ConfigValidationError
+from hand_gesture_recognition.configuration.schema import SplitConfig
+from hand_gesture_recognition.data.datasets.base import Dataset
+
+
+@dataclass
+class DataSplit:
+    train: Dataset
+    val: Dataset
+    test: Dataset
+
+
+def _subset(dataset: Dataset, idx: np.ndarray) -> Dataset:
+    return Dataset(
+        trials=[dataset.trials[i] for i in idx],
+        labels=dataset.labels[idx],
+        subject_ids=dataset.subject_ids[idx],
+        trial_ids=dataset.trial_ids[idx],
+        metadata=dataset.metadata,
+    )
+
+
+def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:
+    config.validate()
+    n = dataset.n_trials
+    rng = np.random.default_rng(config.seed)
+
+    if config.strategy in ("subject_wise", "session_wise"):
+        groups = (
+            dataset.subject_ids
+            if config.split_on == "subject_ids"
+            else dataset.trial_ids
+        )
+        unique = np.unique(groups)
+        rng.shuffle(unique)
+        n_train = max(1, int(round(len(unique) * config.train_ratio)))
+        n_val = max(1, int(round(len(unique) * config.val_ratio)))
+        train_g, val_g, test_g = (
+            unique[:n_train],
+            unique[n_train : n_train + n_val],
+            unique[n_train + n_val :],
+        )
+        if len(test_g) == 0:
+            test_g = unique[n_train + n_val :]
+        train_idx = np.where(np.isin(groups, train_g))[0]
+        val_idx = np.where(np.isin(groups, val_g))[0]
+        test_idx = np.where(np.isin(groups, test_g))[0]
+    elif config.strategy == "random":
+        perm = rng.permutation(n)
+        n_train = int(n * config.train_ratio)
+        n_val = int(n * config.val_ratio)
+        train_idx, val_idx, test_idx = (
+            perm[:n_train],
+            perm[n_train : n_train + n_val],
+            perm[n_train + n_val :],
+        )
+    elif config.strategy == "stratified":
+        from sklearn.model_selection import train_test_split
+
+        train_idx, rest_idx = train_test_split(
+            np.arange(n),
+            train_size=config.train_ratio,
+            stratify=dataset.labels,
+            random_state=config.seed,
+        )
+        val_ratio = config.val_ratio / (config.val_ratio + config.test_ratio)
+        val_idx, test_idx = train_test_split(
+            rest_idx,
+            test_size=1 - val_ratio,
+            stratify=dataset.labels[rest_idx],
+            random_state=config.seed,
+        )
+    elif config.strategy == "predefined":
+        # EPN612 ships two cohorts (trainingJSON / testingJSON); "predefined"
+        # treats train-cohort subjects as train and test-cohort subjects as test.
+        sids = dataset.subject_ids.astype(str)
+        train_idx = np.where(np.char.startswith(sids, "train:"))[0]
+        test_idx = np.where(np.char.startswith(sids, "test:"))[0]
+        val_idx = np.array([], dtype=int)
+    else:
+        raise ConfigValidationError(f"unknown strategy {config.strategy}")
+
+    return DataSplit(
+        train=_subset(dataset, train_idx),
+        val=_subset(dataset, val_idx),
+        test=_subset(dataset, test_idx),
+    )
+
+
+def assert_no_group_leakage(split: DataSplit, group_field: str = "subject_ids") -> None:
+    def ids(d: Dataset) -> set:
+        return set(getattr(d, group_field).tolist())
+
+    tr, va, te = ids(split.train), ids(split.val), ids(split.test)
+    if tr & va:
+        raise ValueError(f"{group_field} overlap between train and val: {tr & va}")
+    if tr & te:
+        raise ValueError(f"{group_field} overlap between train and test: {tr & te}")
+    if va & te:
+        raise ValueError(f"{group_field} overlap between val and test: {va & te}")
