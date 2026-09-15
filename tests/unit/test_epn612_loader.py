@@ -1,7 +1,5 @@
 import json
 
-import numpy as np
-
 from hand_gesture_recognition.data.loaders.epn612 import EPN612Loader
 
 
@@ -63,5 +61,14 @@ def test_epn612_loader_builds_dataset(tmp_path):
 def test_epn612_loader_subject_filter(tmp_path):
     for sub, uid in [("trainingJSON", 1), ("trainingJSON", 2)]:
         _write_user(tmp_path, sub, uid)
-    ds = EPN612Loader(subjects=[1]).load(str(tmp_path))
+    ds = EPN612Loader(subjects=["train:1"]).load(str(tmp_path))
+    assert set(ds.subject_ids.tolist()) == {"train:1"}
+
+
+def test_epn612_loader_subject_filter_is_cohort_aware(tmp_path):
+    # same local user number in both cohorts; filter must select only the
+    # requested cohort, not both.
+    _write_user(tmp_path, "trainingJSON", 1)
+    _write_user(tmp_path, "testingJSON", 1)
+    ds = EPN612Loader(subjects=["train:1"]).load(str(tmp_path))
     assert set(ds.subject_ids.tolist()) == {"train:1"}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import glob
 import json
 import os
-from typing import Dict, Iterable, List, Optional
+from typing import Iterable, List, Optional
 
 import numpy as np
 
@@ -22,7 +22,8 @@ GESTURE_LABELS = {
 
 
 class EPN612Loader(DatasetLoader):
-    def __init__(self, subjects: Optional[Iterable[int]] = None):
+    def __init__(self, subjects: Optional[Iterable[str]] = None):
+        # subjects are cohort-qualified ids, e.g. "train:1" / "test:3"
         self.subjects = set(subjects) if subjects is not None else None
 
     def load(self, path: str) -> Dataset:
@@ -35,7 +36,8 @@ class EPN612Loader(DatasetLoader):
         class_names = list(GESTURE_LABELS.keys())
 
         for f in files:
-            doc = json.load(open(f, encoding="utf-8"))
+            with open(f, encoding="utf-8") as fh:
+                doc = json.load(fh)
             user_id = doc["userInfo"]["name"]
             sampling_rate = float(doc["generalInfo"]["samplingFrequencyInHertz"])
             # The dataset ships two cohorts (trainingJSON / testingJSON) that
@@ -44,6 +46,8 @@ class EPN612Loader(DatasetLoader):
             rel = os.path.relpath(f, path)
             group = "train" if "training" in rel.lower() else "test"
             subject_id = f"{group}:{user_id}"
+            if self.subjects is not None and subject_id not in self.subjects:
+                continue
             # Phase 1 loads trainingSamples only; the framework's own split
             # strategy (subject_wise / random) creates train/val/test.
             for key, sample in doc.get("trainingSamples", {}).items():
@@ -63,7 +67,10 @@ class EPN612Loader(DatasetLoader):
                 trial_ids.append(f"{subject_id}:{key}")
 
         if not trials:
-            raise FileNotFoundError(f"No EPN612 user files found under {path}")
+            raise FileNotFoundError(
+                f"No usable EPN612 trials found under {path} "
+                f"(matched {len(files)} user file(s))"
+            )
 
         return Dataset(
             trials=trials,
@@ -73,7 +80,7 @@ class EPN612Loader(DatasetLoader):
             metadata=DatasetMetadata(
                 name="epn612",
                 version="2020",
-                sampling_rate=sampling_rate or 200.0,
+                sampling_rate=sampling_rate,
                 channels=[f"ch{i}" for i in range(1, 9)],
                 class_names=class_names,
                 content_hash=hash_directory(path),
@@ -83,12 +90,4 @@ class EPN612Loader(DatasetLoader):
 
     def _discover(self, path: str) -> List[str]:
         pattern = os.path.join(path, "**", "user*.json")
-        files = sorted(glob.glob(pattern, recursive=True))
-        if self.subjects is not None:
-            files = [f for f in files if self._subject_num(f) in self.subjects]
-        return files
-
-    @staticmethod
-    def _subject_num(f: str) -> int:
-        base = os.path.basename(f)  # e.g. user12.json
-        return int("".join(ch for ch in base if ch.isdigit()))
+        return sorted(glob.glob(pattern, recursive=True))
