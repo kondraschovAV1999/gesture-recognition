@@ -1,0 +1,67 @@
+import json
+
+import numpy as np
+
+from hand_gesture_recognition.data.loaders.epn612 import EPN612Loader
+
+
+def _write_user(root, subdir, user_id, n_samples=3, length=50):
+    d = root / subdir / f"user{user_id}"
+    d.mkdir(parents=True, exist_ok=True)
+    gestures = ["noGesture", "fist", "open"]
+    samples = {}
+    for i in range(n_samples):
+        samples[f"idx_{i + 1}"] = {
+            "startPointforGestureExecution": 0,
+            "gestureName": gestures[i % len(gestures)],
+            "emg": {
+                f"ch{c}": [float(c + j % 5) for j in range(length)] for c in range(1, 9)
+            },
+        }
+    doc = {
+        "generalInfo": {
+            "samplingFrequencyInHertz": 200,
+            "myoPredictionLabel": {
+                "noGesture": 0,
+                "fist": 1,
+                "waveIn": 2,
+                "waveOut": 3,
+                "open": 4,
+                "pinch": 5,
+            },
+        },
+        "userInfo": {"name": str(user_id)},
+        "trainingSamples": samples,
+        "testingSamples": {},
+    }
+    (d / f"user{user_id}.json").write_text(json.dumps(doc))
+
+
+def test_epn612_loader_builds_dataset(tmp_path):
+    for sub, uid in [("trainingJSON", 1), ("trainingJSON", 2), ("testingJSON", 3)]:
+        _write_user(tmp_path, sub, uid)
+    loader = EPN612Loader()
+    ds = loader.load(str(tmp_path))
+
+    assert ds.n_trials == 9  # 3 users * 3 training samples each
+    assert ds.metadata.sampling_rate == 200.0
+    assert ds.metadata.channels == [f"ch{i}" for i in range(1, 9)]
+    assert set(ds.metadata.class_names) == {
+        "noGesture",
+        "fist",
+        "waveIn",
+        "waveOut",
+        "open",
+        "pinch",
+    }
+    assert ds.trials[0].shape == (50, 8)
+    # subject ids disambiguated by cohort folder, one per trial
+    assert set(ds.subject_ids.tolist()) == {"train:1", "train:2", "test:3"}
+    assert ds.metadata.content_hash
+
+
+def test_epn612_loader_subject_filter(tmp_path):
+    for sub, uid in [("trainingJSON", 1), ("trainingJSON", 2)]:
+        _write_user(tmp_path, sub, uid)
+    ds = EPN612Loader(subjects=[1]).load(str(tmp_path))
+    assert set(ds.subject_ids.tolist()) == {"train:1"}
