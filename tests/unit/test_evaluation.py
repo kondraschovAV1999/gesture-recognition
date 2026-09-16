@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from hand_gesture_recognition.configuration.schema import EvaluationConfig
 from hand_gesture_recognition.evaluation.base import evaluate
@@ -27,3 +28,38 @@ def test_evaluate_computes_accuracy_and_f1():
     assert 0.0 <= res.metrics["macro_f1"] <= 1.0
     assert res.confusion_matrix.shape == (3, 3)
     assert set(res.per_class.keys()) == {"0", "1", "2"}
+
+
+def test_evaluate_computes_per_class_metrics():
+    y_true = np.array([0, 0, 0, 1, 1, 2])
+    y_pred = np.array([0, 0, 1, 1, 2, 2])
+    pred = Prediction(
+        run_id="r1",
+        sample_ids=np.arange(6),
+        y_true=y_true,
+        y_pred=y_pred,
+        y_score=np.eye(3)[y_pred],
+        prediction_duration_s=0.0,
+        backend="classical",
+    )
+    res = evaluate(
+        pred,
+        EvaluationConfig(metrics=["accuracy"]),
+        dataset_id="d1",
+        split_info={},
+        class_names=["rest", "fist", "open"],
+    )
+
+    assert set(res.per_class.keys()) == {"rest", "fist", "open"}
+    # Confusion matrix: [[2,1,0],[0,1,1],[0,0,1]]
+    # class "rest" (0): TP=2, FP=0, FN=1, TN=3
+    assert res.per_class["rest"]["tp"] == 2
+    assert res.per_class["rest"]["fp"] == 0
+    assert res.per_class["rest"]["fn"] == 1
+    assert res.per_class["rest"]["tn"] == 3
+    assert res.per_class["rest"]["precision"] == pytest.approx(1.0)  # 2/(2+0)
+    assert res.per_class["rest"]["recall"] == pytest.approx(2 / 3)  # 2/(2+1)
+    # class "open" (2): TP=1, FP=1, FN=0
+    assert res.per_class["open"]["tp"] == 1
+    assert res.per_class["open"]["fp"] == 1
+    assert res.per_class["open"]["fn"] == 0

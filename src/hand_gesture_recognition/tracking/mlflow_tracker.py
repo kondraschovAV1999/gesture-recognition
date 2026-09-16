@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # Silence mlflow's per-run "agent hint" banner (must be set before `import mlflow`).
 os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
@@ -47,6 +47,51 @@ class MlflowTracker:
 
     def log_results(self, result: EvaluationResult) -> None:
         mlflow.log_metrics(result.metrics)
+        # Per-class precision/recall/F1 + confusion-matrix components.
+        for cls, cls_metrics in result.per_class.items():
+            mlflow.log_metrics(
+                {
+                    f"precision_{cls}": cls_metrics.get("precision", 0.0),
+                    f"recall_{cls}": cls_metrics.get("recall", 0.0),
+                    f"f1_{cls}": cls_metrics.get("f1", 0.0),
+                    f"tp_{cls}": cls_metrics.get("tp", 0),
+                    f"fp_{cls}": cls_metrics.get("fp", 0),
+                    f"tn_{cls}": cls_metrics.get("tn", 0),
+                    f"fn_{cls}": cls_metrics.get("fn", 0),
+                }
+            )
+
+    def log_confusion_matrix(
+        self, result: EvaluationResult, class_names: Optional[List[str]] = None
+    ) -> None:
+        """Log the confusion matrix as a heatmap figure artifact."""
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        cm = result.confusion_matrix
+        n = cm.shape[0]
+        labels = class_names if class_names is not None else [str(i) for i in range(n)]
+
+        fig, ax = plt.subplots()
+        im = ax.imshow(cm, cmap="Blues")
+        ax.set_xticks(range(n))
+        ax.set_yticks(range(n))
+        ax.set_xticklabels(labels, rotation=45, ha="right")
+        ax.set_yticklabels(labels)
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("True")
+        ax.set_title("Confusion matrix")
+        vmax = cm.max() if cm.max() > 0 else 1
+        for i in range(n):
+            for j in range(n):
+                color = "white" if cm[i, j] > vmax / 2 else "black"
+                ax.text(j, i, str(cm[i, j]), ha="center", va="center", color=color)
+        fig.colorbar(im)
+        fig.tight_layout()
+        mlflow.log_figure(fig, "confusion_matrix.png")
+        plt.close(fig)
 
     def log_artifact(self, local_path: str) -> None:
         mlflow.log_artifact(local_path)

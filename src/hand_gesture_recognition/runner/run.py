@@ -65,12 +65,14 @@ class ExperimentRunner:
                     cfg.evaluation,
                     dataset_id=dataset.metadata.name,
                     split_info={"strategy": cfg.split.strategy},
+                    class_names=dataset.metadata.class_names,
                 )
             self.logger.info(f"Evaluation metrics: {result.metrics}")
             with stage(self.logger, "track_and_report"):
                 self.tracker.log_dataset(dataset)
                 self.tracker.log_params({"seed": cfg.seed, "backend": cfg.backend})
                 self.tracker.log_results(result)
+                self.tracker.log_confusion_matrix(result, dataset.metadata.class_names)
                 self._persist_artifacts(dataset, result)
             self.tracker.finish("FINISHED")
             return result

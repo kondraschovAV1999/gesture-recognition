@@ -1,8 +1,8 @@
 # @package windowing
-window_size_samples: null
-window_size_seconds: 0.2
-stride_samples: null
-stride_seconds: 0.05
+window_size_samples: 80
+window_size_seconds: null
+stride_samples: 40
+stride_seconds: null
 overlap_percent: null
 label_granularity: per_window
 padding: none
