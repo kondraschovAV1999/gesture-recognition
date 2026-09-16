@@ -34,6 +34,8 @@ def make_synthetic_dataset(
         labels=np.asarray(labels, dtype=int),
         subject_ids=np.asarray(subject_ids),
         trial_ids=np.asarray(trial_ids),
+        gesture_start=np.zeros(len(trials), dtype=int),
+        gesture_end=np.array([t.shape[0] for t in trials], dtype=int),
         metadata=DatasetMetadata(
             name="synthetic",
             version="0",

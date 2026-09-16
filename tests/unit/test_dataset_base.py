@@ -22,6 +22,8 @@ def test_dataset_n_trials_and_shapes():
         labels=np.array([0, 1]),
         subject_ids=np.array(["s1", "s1"]),
         trial_ids=np.array(["t1", "t2"]),
+        gesture_start=np.array([0, 0]),
+        gesture_end=np.array([100, 100]),
         metadata=_meta(),
     )
     assert d.n_trials == 2

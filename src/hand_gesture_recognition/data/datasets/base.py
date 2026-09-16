@@ -22,13 +22,17 @@ class Dataset:
     """Raw, unwindowed dataset: one trial = one continuous signal.
 
     trials[i] has shape (time_steps, channels) and may vary in length across i.
-    labels, subject_ids, trial_ids are aligned with trials.
+    labels, subject_ids, trial_ids, gesture_start, gesture_end are aligned with
+    trials. gesture_start/gesture_end are EMG sample indices delimiting the
+    gesture segment within the trial; both are -1 for rest (no-gesture) trials.
     """
 
     trials: List[np.ndarray]
     labels: np.ndarray
     subject_ids: np.ndarray
     trial_ids: np.ndarray
+    gesture_start: np.ndarray
+    gesture_end: np.ndarray
     metadata: DatasetMetadata
 
     @property

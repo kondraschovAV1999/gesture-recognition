@@ -14,6 +14,8 @@ def _ds(lengths=(100, 60), labels=(0, 1), subjects=("s1", "s2")):
         labels=np.array(labels),
         subject_ids=np.array(subjects),
         trial_ids=np.array(["t1", "t2"]),
+        gesture_start=np.zeros(len(trials), dtype=int),
+        gesture_end=np.array([t.shape[0] for t in trials], dtype=int),
         metadata=DatasetMetadata(
             name="x",
             version="0",

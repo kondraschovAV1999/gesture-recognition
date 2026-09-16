@@ -9,13 +9,17 @@ def _write_user(root, subdir, user_id, n_samples=3, length=50):
     gestures = ["noGesture", "fist", "open"]
     samples = {}
     for i in range(n_samples):
-        samples[f"idx_{i + 1}"] = {
+        g = gestures[i % len(gestures)]
+        sample = {
             "startPointforGestureExecution": 0,
-            "gestureName": gestures[i % len(gestures)],
+            "gestureName": g,
             "emg": {
                 f"ch{c}": [float(c + j % 5) for j in range(length)] for c in range(1, 9)
             },
         }
+        if g != "noGesture":
+            sample["groundTruthIndex"] = [10, 40]
+        samples[f"idx_{i + 1}"] = sample
     doc = {
         "generalInfo": {
             "samplingFrequencyInHertz": 200,
@@ -72,3 +76,11 @@ def test_epn612_loader_subject_filter_is_cohort_aware(tmp_path):
     _write_user(tmp_path, "testingJSON", 1)
     ds = EPN612Loader(subjects=["train:user1"]).load(str(tmp_path))
     assert set(ds.subject_ids.tolist()) == {"train:user1"}
+
+
+def test_epn612_loader_extracts_gesture_bounds(tmp_path):
+    _write_user(tmp_path, "trainingJSON", 1)
+    ds = EPN612Loader().load(str(tmp_path))
+    # idx_1 = noGesture (rest), idx_2/idx_3 = gestures with groundTruthIndex [10, 40]
+    assert ds.gesture_start.tolist() == [-1, 10, 10]
+    assert ds.gesture_end.tolist() == [-1, 40, 40]

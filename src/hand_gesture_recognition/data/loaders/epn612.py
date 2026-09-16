@@ -35,6 +35,8 @@ class EPN612Loader(DatasetLoader):
         sampling_rate: Optional[float] = None
         label_map: Optional[Dict[str, int]] = None
         class_names: List[str] = list(GESTURE_LABELS.keys())
+        gesture_starts: List[int] = []
+        gesture_ends: List[int] = []
 
         for f in files:
             # Derive the subject id from the full file path (cohort folder +
@@ -73,10 +75,24 @@ class EPN612Loader(DatasetLoader):
                 gesture = sample.get("gestureName", "noGesture")
                 if gesture not in label_map:
                     continue
+                # Gesture bounds: groundTruthIndex [start, end] when present,
+                # else startPointforGestureExecution -> end of recording, else
+                # rest trial (-1, -1).
+                if gesture == "noGesture":
+                    g_start, g_end = -1, -1
+                else:
+                    gti = sample.get("groundTruthIndex")
+                    if gti is not None and len(gti) == 2:
+                        g_start, g_end = int(gti[0]), int(gti[1])
+                    else:
+                        g_start = int(sample.get("startPointforGestureExecution", 0))
+                        g_end = x.shape[0]
                 trials.append(x)
                 labels.append(label_map[gesture])
                 subject_ids.append(subject_id)
                 trial_ids.append(f"{subject_id}:{key}")
+                gesture_starts.append(g_start)
+                gesture_ends.append(g_end)
 
         if not trials:
             raise FileNotFoundError(
@@ -89,6 +105,8 @@ class EPN612Loader(DatasetLoader):
             labels=np.asarray(labels, dtype=int),
             subject_ids=np.asarray(subject_ids),
             trial_ids=np.asarray(trial_ids),
+            gesture_start=np.asarray(gesture_starts, dtype=int),
+            gesture_end=np.asarray(gesture_ends, dtype=int),
             metadata=DatasetMetadata(
                 name="epn612",
                 version="2020",

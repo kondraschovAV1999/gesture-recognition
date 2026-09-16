@@ -23,6 +23,8 @@ def _subset(dataset: Dataset, idx: np.ndarray) -> Dataset:
         labels=dataset.labels[idx],
         subject_ids=dataset.subject_ids[idx],
         trial_ids=dataset.trial_ids[idx],
+        gesture_start=dataset.gesture_start[idx],
+        gesture_end=dataset.gesture_end[idx],
         metadata=dataset.metadata,
     )
 
