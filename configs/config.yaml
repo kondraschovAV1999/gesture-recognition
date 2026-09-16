@@ -3,6 +3,7 @@ defaults:
   - split: subject_wise
   - windowing: default
   - classical: random_forest
+  - neural: dnn
   - evaluation: basic
   - analytics: basic
   - experiment: default

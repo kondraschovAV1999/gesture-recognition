@@ -19,7 +19,7 @@ def test_compose_mode_returns_validated_config():
 
 def test_compose_mode_rejects_invalid_override():
     with pytest.raises(ConfigValidationError):
-        load_config(mode="compose", overrides=["backend=neural"])
+        load_config(mode="compose", overrides=["backend=unsupported"])
 
 
 def test_compose_mode_rejects_inconsistent_windowing():

@@ -16,6 +16,8 @@ dependencies = [
     "mlflow>=2.10",
     "matplotlib>=3.7",
     "pyyaml>=6.0",
+    "torch>=2.0",
+    "lightning>=2.0",
 ]
 
 [project.optional-dependencies]

@@ -58,7 +58,12 @@ class ExperimentRunner:
                 if cfg.split.strategy in ("subject_wise", "session_wise", "predefined"):
                     assert_no_group_leakage(split)
             with stage(self.logger, "train"):
-                prediction = self._train_and_predict(split.train, split.test)
+                if cfg.backend == "classical":
+                    prediction = self._train_and_predict_classical(
+                        split.train, split.test
+                    )
+                else:
+                    prediction = self._train_and_predict_neural(split)
             with stage(self.logger, "evaluate"):
                 result = evaluate(
                     prediction,
@@ -107,7 +112,7 @@ class ExperimentRunner:
                 json.dump(run_quality_checks(dataset), f, indent=2)
             plot_class_distribution(dataset, os.path.join(d, "class_distribution.png"))
 
-    def _train_and_predict(self, train, test):
+    def _train_and_predict_classical(self, train, test):
         from hand_gesture_recognition.classical.pipelines.windowing import (
             WindowingTransformer,
         )
@@ -141,6 +146,46 @@ class ExperimentRunner:
             windowed=test_wd,
             y_pred=y_pred,
             y_score=y_score,
+            run_id=self.cfg.run_id,
+            duration_s=duration,
+        )
+
+    def _train_and_predict_neural(self, split):
+        import lightning.pytorch as pl
+
+        from hand_gesture_recognition.data.windowing.base import window_dataset
+        from hand_gesture_recognition.neural.adapters.lightning import (
+            LightningPredictionAdapter,
+        )
+
+        pl.seed_everything(self.cfg.seed, workers=True)
+
+        n_channels = len(split.train.metadata.channels)
+        n_classes = len(split.train.metadata.class_names)
+
+        # The DataModule's split/windowing args are runtime objects (containing
+        # numpy arrays), so bind the config args via _partial_ first, then pass
+        # the runtime objects directly (avoids OmegaConf trying to convert them).
+        dm_partial = instantiate(self.cfg.neural.datamodule, _partial_=True)
+        datamodule = dm_partial(split=split, windowing=self.cfg.windowing)
+        model = instantiate(
+            self.cfg.neural.model, n_channels=n_channels, n_classes=n_classes
+        )
+        trainer = instantiate(self.cfg.neural.trainer)
+
+        t0 = time.perf_counter()
+        trainer.fit(model, datamodule=datamodule)
+        raw = trainer.predict(model, datamodule=datamodule)
+        duration = time.perf_counter() - t0
+
+        # Window the test partition (same shared windowing) to recover the
+        # per-window metadata + y_true for the Prediction.
+        test_wd = window_dataset(split.test, self.cfg.windowing)
+
+        adapter = LightningPredictionAdapter()
+        return adapter.to_prediction(
+            windowed=test_wd,
+            raw_predictions=raw,
             run_id=self.cfg.run_id,
             duration_s=duration,
         )

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from hand_gesture_recognition.configuration.errors import ConfigValidationError
 
 SCHEMA_VERSION = "1.0"
-SUPPORTED_BACKENDS = ("classical",)  # neural arrives in Phase 2
+SUPPORTED_BACKENDS = ("classical", "neural")
 
 
 @dataclass
@@ -119,6 +119,35 @@ class ClassicalConfig:
 
 
 @dataclass
+class NeuralConfig:
+    datamodule: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "_target_": "hand_gesture_recognition.neural.datamodules.emg.EMGDataModule",
+            "batch_size": 32,
+            "num_workers": 0,
+        }
+    )
+    model: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "_target_": "hand_gesture_recognition.neural.models.dnn.DNNModule",
+            "hidden_dims": [128, 64],
+            "lr": 1e-3,
+        }
+    )
+    trainer: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "_target_": "lightning.pytorch.Trainer",
+            "max_epochs": 5,
+            "accelerator": "cpu",
+            "enable_progress_bar": False,
+            "enable_model_summary": False,
+            "enable_checkpointing": False,
+            "logger": False,
+        }
+    )
+
+
+@dataclass
 class EvaluationConfig:
     metrics: List[str] = field(
         default_factory=lambda: ["accuracy", "balanced_accuracy", "macro_f1"]
@@ -154,6 +183,7 @@ class ExperimentConfig:
     split: SplitConfig = field(default_factory=SplitConfig)
     windowing: WindowingConfig = field(default_factory=WindowingConfig)
     classical: ClassicalConfig = field(default_factory=ClassicalConfig)
+    neural: NeuralConfig = field(default_factory=NeuralConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
     tracking: TrackingConfig = field(default_factory=TrackingConfig)
@@ -163,7 +193,7 @@ class ExperimentConfig:
 def validate_experiment_config(cfg: ExperimentConfig) -> ExperimentConfig:
     if cfg.backend not in SUPPORTED_BACKENDS:
         raise ConfigValidationError(
-            f"backend={cfg.backend!r} not supported in Phase 1 (expected one of {SUPPORTED_BACKENDS})"
+            f"backend={cfg.backend!r} not supported (expected one of {SUPPORTED_BACKENDS})"
         )
     if cfg.seed is None:
         raise ConfigValidationError("seed must be set for reproducibility")

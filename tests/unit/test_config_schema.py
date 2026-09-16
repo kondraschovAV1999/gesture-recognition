@@ -47,7 +47,7 @@ def test_experiment_validation_passes_on_defaults():
 
 def test_experiment_validation_rejects_bad_backend():
     cfg = _base_experiment()
-    cfg.backend = "neural"  # Phase 1 does not implement neural
+    cfg.backend = "unsupported"
     with pytest.raises(ConfigValidationError):
         validate_experiment_config(cfg)
 
