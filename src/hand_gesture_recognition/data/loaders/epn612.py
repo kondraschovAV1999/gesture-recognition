@@ -3,7 +3,7 @@ from __future__ import annotations
 import glob
 import json
 import os
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 import numpy as np
 
@@ -33,11 +33,20 @@ class EPN612Loader(DatasetLoader):
         subject_ids: List[str] = []
         trial_ids: List[str] = []
         sampling_rate: Optional[float] = None
-        class_names = list(GESTURE_LABELS.keys())
+        label_map: Optional[Dict[str, int]] = None
+        class_names: List[str] = list(GESTURE_LABELS.keys())
 
         for f in files:
             with open(f, encoding="utf-8") as fh:
                 doc = json.load(fh)
+            if label_map is None:
+                custom = doc.get("generalInfo", {}).get("myoPredictionLabel")
+                label_map = (
+                    {str(k): int(v) for k, v in custom.items()}
+                    if custom
+                    else dict(GESTURE_LABELS)
+                )
+                class_names = list(label_map.keys())
             user_id = doc["userInfo"]["name"]
             sampling_rate = float(doc["generalInfo"]["samplingFrequencyInHertz"])
             # The dataset ships two cohorts (trainingJSON / testingJSON) that
@@ -59,10 +68,10 @@ class EPN612Loader(DatasetLoader):
                     [np.asarray(emg[c], dtype=np.float32) for c in channels], axis=1
                 )
                 gesture = sample.get("gestureName", "noGesture")
-                if gesture not in GESTURE_LABELS:
+                if gesture not in label_map:
                     continue
                 trials.append(x)
-                labels.append(GESTURE_LABELS[gesture])
+                labels.append(label_map[gesture])
                 subject_ids.append(subject_id)
                 trial_ids.append(f"{subject_id}:{key}")
 

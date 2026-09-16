@@ -67,6 +67,7 @@ class ExperimentRunner:
                 self.tracker.log_results(result)
                 self._persist_artifacts(dataset, result)
             self.tracker.finish("FINISHED")
+            return result
         except Exception:
             self.tracker.finish("FAILED")
             raise
@@ -87,6 +88,13 @@ class ExperimentRunner:
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "dataset_summary.json"), "w") as f:
             json.dump(dataset_summary(dataset), f, indent=2)
+        if self.cfg.analytics.run_qc:
+            from hand_gesture_recognition.analytics.qc import run_quality_checks
+            from hand_gesture_recognition.analytics.plots import plot_class_distribution
+
+            with open(os.path.join(d, "quality_checks.json"), "w") as f:
+                json.dump(run_quality_checks(dataset), f, indent=2)
+            plot_class_distribution(dataset, os.path.join(d, "class_distribution.png"))
 
     def _train_and_predict(self, train, test):
         from hand_gesture_recognition.classical.pipelines.windowing import (
