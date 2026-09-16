@@ -53,3 +53,28 @@ def test_window_seconds_derived():
     )  # 40 / 10 @200Hz
     wd = window_dataset(ds, cfg)
     assert wd.X.shape[1] == 40
+
+
+def test_per_window_labels_from_gesture_bounds():
+    ds = Dataset(
+        trials=[
+            np.zeros((50, 2), dtype=np.float32),
+            np.zeros((50, 2), dtype=np.float32),
+        ],
+        labels=np.array([1, 0]),
+        subject_ids=np.array(["s1", "s1"]),
+        trial_ids=np.array(["t1", "t2"]),
+        gesture_start=np.array([10, -1]),
+        gesture_end=np.array([30, -1]),
+        metadata=DatasetMetadata(
+            name="x",
+            version="0",
+            sampling_rate=200.0,
+            channels=["c1", "c2"],
+            class_names=["noGesture", "fist"],
+            content_hash="h",
+        ),
+    )
+    wd = window_dataset(ds, WindowingConfig(window_size_samples=10, stride_samples=10))
+    # trial 0 (gesture [10,30]) -> [0,1,1,0,0]; trial 1 (rest) -> [0,0,0,0,0]
+    assert wd.y.tolist() == [0, 1, 1, 0, 0, 0, 0, 0, 0, 0]
