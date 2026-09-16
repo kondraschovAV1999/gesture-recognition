@@ -134,7 +134,7 @@ class AnalyticsConfig:
 
 @dataclass
 class TrackingConfig:
-    tracking_uri: str = "mlruns"
+    tracking_uri: str = "sqlite:///mlflow.db"
     experiment_name: str = "hand_gesture_recognition"
 
 

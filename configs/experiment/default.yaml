@@ -3,7 +3,7 @@ backend: classical
 seed: 42
 deterministic: false
 tracking:
-  tracking_uri: mlruns
+  tracking_uri: sqlite:///mlflow.db
   experiment_name: hand_gesture_recognition
 reporting:
   formats: [json, html]

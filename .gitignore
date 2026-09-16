@@ -22,6 +22,8 @@ resources/data/
 
 # MLflow local store
 mlruns/
+mlflow.db
+*.db
 
 # SDD scratch workspace (task briefs, reports, review packages, ledger)
 .superpowers/
