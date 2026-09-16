@@ -3,6 +3,9 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, Optional
 
+# Silence mlflow's per-run "agent hint" banner (must be set before `import mlflow`).
+os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
+
 import mlflow
 
 from hand_gesture_recognition.configuration.schema import TrackingConfig
