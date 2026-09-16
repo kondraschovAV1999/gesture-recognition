@@ -8,7 +8,7 @@ from typing import Dict, Iterable, List, Optional
 import numpy as np
 
 from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
-from hand_gesture_recognition.data.hashing import hash_directory
+from hand_gesture_recognition.data.hashing import hash_directory_cached
 from hand_gesture_recognition.data.loaders.base import DatasetLoader
 
 GESTURE_LABELS = {
@@ -23,7 +23,7 @@ GESTURE_LABELS = {
 
 class EPN612Loader(DatasetLoader):
     def __init__(self, subjects: Optional[Iterable[str]] = None):
-        # subjects are cohort-qualified ids, e.g. "train:1" / "test:3"
+        # subjects are cohort-qualified ids, e.g. "train:user1" / "test:user3"
         self.subjects = set(subjects) if subjects is not None else None
 
     def load(self, path: str) -> Dataset:
@@ -37,8 +37,21 @@ class EPN612Loader(DatasetLoader):
         class_names: List[str] = list(GESTURE_LABELS.keys())
 
         for f in files:
+            # Derive the subject id from the full file path (cohort folder +
+            # user subfolder), not from JSON content, so we can filter subjects
+            # WITHOUT parsing every file. Layout: <cohort>/<user>/<user>.json.
+            rel = os.path.relpath(f, path)
+            parts = rel.split(os.sep)
+            cohort_dir = parts[0] if parts else ""
+            group = "train" if "training" in cohort_dir.lower() else "test"
+            subject_dir = parts[1] if len(parts) > 1 else os.path.splitext(parts[-1])[0]
+            subject_id = f"{group}:{subject_dir}"
+            if self.subjects is not None and subject_id not in self.subjects:
+                continue
+
             with open(f, encoding="utf-8") as fh:
                 doc = json.load(fh)
+            sampling_rate = float(doc["generalInfo"]["samplingFrequencyInHertz"])
             if label_map is None:
                 custom = doc.get("generalInfo", {}).get("myoPredictionLabel")
                 label_map = (
@@ -47,16 +60,6 @@ class EPN612Loader(DatasetLoader):
                     else dict(GESTURE_LABELS)
                 )
                 class_names = list(label_map.keys())
-            user_id = doc["userInfo"]["name"]
-            sampling_rate = float(doc["generalInfo"]["samplingFrequencyInHertz"])
-            # The dataset ships two cohorts (trainingJSON / testingJSON) that
-            # reuse the same local user numbering; disambiguate subject ids by
-            # cohort folder so subject-wise splits cannot collide.
-            rel = os.path.relpath(f, path)
-            group = "train" if "training" in rel.lower() else "test"
-            subject_id = f"{group}:{user_id}"
-            if self.subjects is not None and subject_id not in self.subjects:
-                continue
             # Phase 1 loads trainingSamples only; the framework's own split
             # strategy (subject_wise / random) creates train/val/test.
             for key, sample in doc.get("trainingSamples", {}).items():
@@ -92,7 +95,7 @@ class EPN612Loader(DatasetLoader):
                 sampling_rate=sampling_rate,
                 channels=[f"ch{i}" for i in range(1, 9)],
                 class_names=class_names,
-                content_hash=hash_directory(path),
+                content_hash=hash_directory_cached(path),
                 provenance={"source": "EMG-EPN612", "loader": "EPN612Loader"},
             ),
         )

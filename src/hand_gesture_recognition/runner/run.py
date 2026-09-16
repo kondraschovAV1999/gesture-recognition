@@ -16,6 +16,7 @@ from hand_gesture_recognition.data.splits.base import (
 )
 from hand_gesture_recognition.evaluation.base import EvaluationResult, evaluate
 from hand_gesture_recognition.logging_setup.config import get_logger
+from hand_gesture_recognition.paths import resolve_path
 from hand_gesture_recognition.reporting.reporters import (
     HtmlReporter,
     JsonReporter,
@@ -76,7 +77,10 @@ class ExperimentRunner:
         if self.cfg.dataset.name == "synthetic":
             return make_synthetic_dataset(seed=self.cfg.seed)
         loader = instantiate(self.cfg.dataset.loader)
-        return loader.load(self.cfg.dataset.path)
+        # Resolve the dataset path to a full path anchored at the project root
+        # (the config default is a relative path, which only works when the
+        # process runs from the repo root).
+        return loader.load(resolve_path(self.cfg.dataset.path))
 
     def _analytics(self, dataset) -> None:
         if not self.cfg.analytics.enabled:

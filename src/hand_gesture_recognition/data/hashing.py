@@ -30,8 +30,28 @@ def hash_directory(root: str) -> str:
     entries: List[tuple] = []
     for dirpath, _dirs, files in os.walk(root):
         for name in files:
+            if name == ".content_hash":
+                continue  # the cache sidecar is not part of the dataset bytes
             abs_path = os.path.join(dirpath, name)
             entries.append((os.path.relpath(abs_path, root), abs_path))
     for rel_path, abs_path in sorted(entries):
         _update_hash_with_file(h, rel_path, abs_path)
     return h.hexdigest()
+
+
+def hash_directory_cached(root: str) -> str:
+    """Hash every file under root, caching the result in `<root>/.content_hash`.
+
+    The first call computes the SHA-256 (potentially slow for large datasets)
+    and writes it to the sidecar; subsequent calls read the cached value.
+    Delete the `.content_hash` sidecar to force a recomputation (e.g. after
+    changing the dataset files). The sidecar is excluded from the hash itself.
+    """
+    cache = os.path.join(root, ".content_hash")
+    if os.path.exists(cache):
+        with open(cache, encoding="utf-8") as fh:
+            return fh.read().strip()
+    digest = hash_directory(root)
+    with open(cache, "w", encoding="utf-8") as fh:
+        fh.write(digest + "\n")
+    return digest

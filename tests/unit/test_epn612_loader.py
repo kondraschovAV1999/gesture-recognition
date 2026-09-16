@@ -28,7 +28,7 @@ def _write_user(root, subdir, user_id, n_samples=3, length=50):
                 "pinch": 5,
             },
         },
-        "userInfo": {"name": str(user_id)},
+        "userInfo": {"name": f"user{user_id}"},
         "trainingSamples": samples,
         "testingSamples": {},
     }
@@ -54,15 +54,15 @@ def test_epn612_loader_builds_dataset(tmp_path):
     }
     assert ds.trials[0].shape == (50, 8)
     # subject ids disambiguated by cohort folder, one per trial
-    assert set(ds.subject_ids.tolist()) == {"train:1", "train:2", "test:3"}
+    assert set(ds.subject_ids.tolist()) == {"train:user1", "train:user2", "test:user3"}
     assert ds.metadata.content_hash
 
 
 def test_epn612_loader_subject_filter(tmp_path):
     for sub, uid in [("trainingJSON", 1), ("trainingJSON", 2)]:
         _write_user(tmp_path, sub, uid)
-    ds = EPN612Loader(subjects=["train:1"]).load(str(tmp_path))
-    assert set(ds.subject_ids.tolist()) == {"train:1"}
+    ds = EPN612Loader(subjects=["train:user1"]).load(str(tmp_path))
+    assert set(ds.subject_ids.tolist()) == {"train:user1"}
 
 
 def test_epn612_loader_subject_filter_is_cohort_aware(tmp_path):
@@ -70,5 +70,5 @@ def test_epn612_loader_subject_filter_is_cohort_aware(tmp_path):
     # requested cohort, not both.
     _write_user(tmp_path, "trainingJSON", 1)
     _write_user(tmp_path, "testingJSON", 1)
-    ds = EPN612Loader(subjects=["train:1"]).load(str(tmp_path))
-    assert set(ds.subject_ids.tolist()) == {"train:1"}
+    ds = EPN612Loader(subjects=["train:user1"]).load(str(tmp_path))
+    assert set(ds.subject_ids.tolist()) == {"train:user1"}

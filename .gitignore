@@ -18,7 +18,7 @@ uv.lock
 output/
 
 # Datasets (content-hash anchored, not committed)
-resources/data/EPN612/
+resources/data/
 
 # MLflow local store
 mlruns/
