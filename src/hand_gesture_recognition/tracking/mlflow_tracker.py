@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, Optional
 
 import mlflow
@@ -13,6 +14,11 @@ class MlflowTracker:
     def __init__(self, config: TrackingConfig):
         self.config = config
         self.run_id: Optional[str] = None
+        # mlflow 3.x gates the local file store (e.g. a bare `mlruns/` dir)
+        # behind MLFLOW_ALLOW_FILE_STORE; the tracker owns MLflow setup, so it
+        # enables the file store when a scheme-less (local path) URI is used.
+        if "://" not in config.tracking_uri:
+            os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
         mlflow.set_tracking_uri(config.tracking_uri)
         mlflow.set_experiment(config.experiment_name)
 
