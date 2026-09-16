@@ -14,7 +14,7 @@ from hand_gesture_recognition.data.splits.base import (
     assert_no_group_leakage,
     split_dataset,
 )
-from hand_gesture_recognition.evaluation.base import evaluate
+from hand_gesture_recognition.evaluation.base import EvaluationResult, evaluate
 from hand_gesture_recognition.logging_setup.config import get_logger
 from hand_gesture_recognition.reporting.reporters import (
     HtmlReporter,
@@ -37,7 +37,7 @@ class ExperimentRunner:
         )
         self.tracker = MlflowTracker(cfg.tracking)
 
-    def run(self) -> None:
+    def run(self) -> EvaluationResult:
         cfg = self.cfg
         self.tracker.start(cfg.run_id)
         try:
