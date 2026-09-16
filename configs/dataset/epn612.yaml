@@ -4,3 +4,4 @@ path: resources/data/EPN612
 sampling_rate: 200
 loader:
   _target_: hand_gesture_recognition.data.loaders.epn612.EPN612Loader
+  subjects: null  # e.g. override with: dataset.loader.subjects=[train:user1,train:user2]
