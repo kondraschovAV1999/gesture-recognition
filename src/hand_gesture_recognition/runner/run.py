@@ -151,12 +151,18 @@ class ExperimentRunner:
         )
 
     def _train_and_predict_neural(self, split):
+        import logging
+
         import lightning.pytorch as pl
 
         from hand_gesture_recognition.data.windowing.base import window_dataset
         from hand_gesture_recognition.neural.adapters.lightning import (
             LightningPredictionAdapter,
         )
+
+        # Keep Lightning's own console chatter quiet; the framework logs stages.
+        logging.getLogger("lightning.pytorch").setLevel(logging.WARNING)
+        logging.getLogger("lightning.fabric").setLevel(logging.WARNING)
 
         pl.seed_everything(self.cfg.seed, workers=True)
 
