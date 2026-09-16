@@ -62,6 +62,7 @@ class ExperimentRunner:
                     dataset_id=dataset.metadata.name,
                     split_info={"strategy": cfg.split.strategy},
                 )
+            self.logger.info(f"Evaluation metrics: {result.metrics}")
             with stage(self.logger, "track_and_report"):
                 self.tracker.log_dataset(dataset)
                 self.tracker.log_params({"seed": cfg.seed, "backend": cfg.backend})
