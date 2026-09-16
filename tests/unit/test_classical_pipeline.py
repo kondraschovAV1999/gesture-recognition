@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from sklearn.pipeline import Pipeline
 
 from hand_gesture_recognition.classical.models.random_forest import (
@@ -36,3 +37,26 @@ def test_full_classical_pipeline_fits_and_predicts():
     preds = model.predict(X)
     assert preds.shape == wd.y.shape
     assert set(preds.tolist()).issubset(set(range(3)))
+
+
+def test_time_domain_features_per_channel():
+    # 1 window, 3 time steps, 1 channel: values [0, 2, 4]
+    X = np.array([[[0.0], [2.0], [4.0]]], dtype=np.float32)  # (1, 3, 1)
+    out = TimeDomainFeatures().transform(X)
+    assert out.shape == (1, 7)  # 7 features x 1 channel
+    rms, std, mn, mx, mean, mx_mean, mn_mx = out[0]
+    assert rms == pytest.approx(np.sqrt(20 / 3))
+    assert std == pytest.approx(np.std([0.0, 2.0, 4.0]))
+    assert mn == 0.0
+    assert mx == 4.0
+    assert mean == 2.0
+    assert mx_mean == pytest.approx(2.0)  # max / mean = 4 / 2
+    assert mn_mx == 0.0  # min / max = 0 / 4
+
+
+def test_time_domain_features_8_channels():
+    X = np.zeros((5, 40, 8), dtype=np.float32)  # 5 windows, 40 time, 8 channels
+    out = TimeDomainFeatures().transform(X)
+    assert out.shape == (5, 56)  # 7 features x 8 channels
+    # all-zero input must not produce NaN (division guards)
+    assert np.isfinite(out).all()
