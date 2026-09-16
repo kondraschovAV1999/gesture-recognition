@@ -20,5 +20,5 @@ def test_classical_smoke(tmp_path, monkeypatch):
     runner = ExperimentRunner(cfg)
     runner.run()
     out = tmp_path / "output"
-    assert (out / "evaluation" / cfg.run_id / "resolved.yaml").exists()
+    assert (out / "evaluation" / cfg.run_id / "config" / "resolved.yaml").exists()
     assert (out / "evaluation" / cfg.run_id / "report.json").exists()

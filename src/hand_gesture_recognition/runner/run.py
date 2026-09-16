@@ -128,13 +128,9 @@ class ExperimentRunner:
 
     def _persist_artifacts(self, dataset, result) -> None:
         run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)
-        os.makedirs(run_dir, exist_ok=True)
-        # NOTE: resolved.yaml is written directly under the run dir (not a
-        # `config/` subdir) so the smoke test's assertion on
-        #   evaluation/<run_id>/resolved.yaml
-        # holds. The brief's prose also references config/resolved.yaml; the
-        # executable smoke test is the authoritative contract here.
-        resolved_path = os.path.join(run_dir, "resolved.yaml")
+        config_dir = os.path.join(run_dir, "config")
+        os.makedirs(config_dir, exist_ok=True)
+        resolved_path = os.path.join(config_dir, "resolved.yaml")
         save_resolved_config(self.cfg, resolved_path)
         self.tracker.log_artifact(resolved_path)
 
