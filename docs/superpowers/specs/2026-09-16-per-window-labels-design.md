@@ -74,20 +74,28 @@ per-window label (0 = rest, 1–5 = gesture).
 accordingly, so the per-window labeling path is exercised deterministically
 in tests.
 
-### 5. Full classical model test
+### 5. Full classical model test (real data, small subset — no synthetic)
 
-`tests/integration/test_classical_full.py`:
+`tests/datasets/test_classical_full.py` (auto-skips when
+`resources/data/EPN612` is absent):
 
-- **Synthetic path (always runs):** load synthetic → subject-wise split →
-  window (overlapping, per-window labels) → `TimeDomainFeatures` →
-  `RandomForest` → predict → `SklearnPredictionAdapter` → `evaluate`. Assert:
-  - windowed data contains both class `0` (rest) and gesture labels;
+- Load a **small subject subset** (e.g. 6–8 subjects from `trainingJSON/`)
+  using `EPN612Loader(subjects=[...])`.
+- Subject-wise split → window (overlapping, per-window labels) →
+  `TimeDomainFeatures` → `RandomForest` → predict → `SklearnPredictionAdapter`
+  → `evaluate`.
+- Assert:
+  - windowed data contains both class `0` (rest) and gesture labels (1–5);
+  - per-window labels match the ground-truth `[start, end]` bounds
+    (rest windows → 0, gesture windows → gesture label);
   - `Prediction`/`EvaluationResult` schema is correct;
-  - metrics are present and accuracy is clearly above chance.
-- **Real-data path (skip-if-absent):** load a small subject subset from
-  `resources/data/EPN612`, window, and assert per-window labels are correct
-  against the ground-truth `[start, end]` (rest windows → 0, gesture windows
-  → gesture label).
+  - metrics are present and accuracy is above chance.
+
+Run with:
+
+```bash
+python -m pytest tests/datasets/test_classical_full.py -v
+```
 
 ## Testing strategy additions
 
