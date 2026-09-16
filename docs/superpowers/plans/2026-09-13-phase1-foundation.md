@@ -2452,13 +2452,13 @@ from hand_gesture_recognition.reporting.reporters import HtmlReporter, JsonRepor
 from hand_gesture_recognition.tracking.mlflow_tracker import MlflowTracker
 from hand_gesture_recognition.tracing.stage import stage
 
-OUTPUT_ROOT = os.environ.get("HAND_GESTURE_RECOGNITION_OUTPUT", "output")
-
-
 class ExperimentRunner:
     def __init__(self, cfg: ExperimentConfig):
         self.cfg = cfg
         self.cfg.run_id = cfg.run_id or f"{cfg.backend}-{uuid.uuid4().hex[:8]}"
+        # output root is read at construction time (tests set the env var after
+        # import but before construction), so it must NOT be a module constant.
+        self.output_root = os.environ.get("HAND_GESTURE_RECOGNITION_OUTPUT", "output")
         self.logger = get_logger("hand_gesture_recognition.runner", run_id=self.cfg.run_id)
         self.tracker = MlflowTracker(cfg.tracking)
 
@@ -2502,7 +2502,7 @@ class ExperimentRunner:
             return
         from hand_gesture_recognition.analytics.stats import dataset_summary
         import json
-        d = os.path.join(OUTPUT_ROOT, "analytics", dataset.metadata.name)
+        d = os.path.join(self.output_root, "analytics", dataset.metadata.name)
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "dataset_summary.json"), "w") as f:
             json.dump(dataset_summary(dataset), f, indent=2)
@@ -2541,7 +2541,7 @@ class ExperimentRunner:
         )
 
     def _persist_artifacts(self, dataset, result) -> None:
-        run_dir = os.path.join(OUTPUT_ROOT, "evaluation", self.cfg.run_id)
+        run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)
         cfg_dir = os.path.join(run_dir, "config")
         os.makedirs(cfg_dir, exist_ok=True)
         resolved_path = os.path.join(cfg_dir, "resolved.yaml")
@@ -2585,14 +2585,14 @@ if __name__ == "__main__":
 Run: `pytest tests/integration/test_smoke.py -v`
 Expected: PASS (1 passed).
 
-- [ ] **Step 5: Run the full test suite and a real CLI invocation**
+- [ ] **Step 5: Run the full test suite and a CLI invocation (synthetic dataset)**
 
 ```bash
-pytest
-python -m hand_gesture_recognition --mode compose "split.strategy=subject_wise"
+python -m pytest -q
+python -m hand_gesture_recognition --mode compose dataset.name=synthetic split.strategy=subject_wise
 ```
 
-Expected: full suite green; CLI run creates `output/evaluation/<run_id>/{config/resolved.yaml, report.json, report.html}` and an `mlruns/` entry with the dataset content hash.
+Expected: full suite green; CLI run creates `output/evaluation/<run_id>/{config/resolved.yaml, report.json, report.html}` and an `mlruns/` entry with the dataset content hash. (A real EPN612 run — default `dataset.name=epn612` — loads ~612 subjects and is intentionally left as a slow manual step, not part of automated verification.)
 
 - [ ] **Step 6: Commit**
 
