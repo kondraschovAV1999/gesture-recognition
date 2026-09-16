@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import time
 import uuid
+from datetime import datetime
 
 from hydra.utils import instantiate
 
@@ -29,7 +30,10 @@ from hand_gesture_recognition.tracing.stage import stage
 class ExperimentRunner:
     def __init__(self, cfg: ExperimentConfig):
         self.cfg = cfg
-        self.cfg.run_id = cfg.run_id or f"{cfg.backend}-{uuid.uuid4().hex[:8]}"
+        # Timestamped run_id (sortable, human-findable) + short unique suffix.
+        self.cfg.run_id = cfg.run_id or (
+            f"{cfg.backend}-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:4]}"
+        )
         # output root is read at construction time (tests set the env var after
         # import but before construction), so it must NOT be a module constant.
         self.output_root = os.environ.get("HAND_GESTURE_RECOGNITION_OUTPUT", "output")
