@@ -1,7 +1,7 @@
 # @package _global_
 backend: classical
 seed: 42
-deterministic: false
+deterministic: true
 tracking:
   tracking_uri: sqlite:///mlflow.db
   experiment_name: hand_gesture_recognition

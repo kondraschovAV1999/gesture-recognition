@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
+import pandas as pd
 
 
 @dataclass
@@ -34,6 +35,7 @@ class Dataset:
     gesture_start: np.ndarray
     gesture_end: np.ndarray
     metadata: DatasetMetadata
+    subject_info: Optional[pd.DataFrame] = None  # index=subject_id, cols=demographics
 
     @property
     def n_trials(self) -> int:

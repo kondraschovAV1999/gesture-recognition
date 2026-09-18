@@ -1,6 +1,8 @@
+import numpy as np
 import pytest
 
 from hand_gesture_recognition.configuration.schema import SplitConfig
+from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.data.splits.base import (
     assert_no_group_leakage,
@@ -60,3 +62,55 @@ def test_leakage_detection_raises():
     split.val = split.train
     with pytest.raises(ValueError):
         assert_no_group_leakage(split)
+
+
+def _epn612_like_dataset():
+    """Build a dataset mimicking the EPN612 A1 structure:
+    train cohort (train:) with trainingSamples + testingSamples; test cohort
+    (test:) with trainingSamples only."""
+    trials, labels, subjects, tids = [], [], [], []
+    for subj in ["train:s1", "train:s2"]:
+        for sec in ["trainingSamples", "testingSamples"]:
+            for i in range(2):
+                trials.append(np.zeros((100, 8), dtype=np.float32))
+                labels.append(1)
+                subjects.append(subj)
+                tids.append(f"{subj}:{sec}:idx_{i}")
+    for i in range(2):
+        trials.append(np.zeros((100, 8), dtype=np.float32))
+        labels.append(2)
+        subjects.append("test:s3")
+        tids.append(f"test:s3:trainingSamples:idx_{i}")
+    return Dataset(
+        trials=trials,
+        labels=np.asarray(labels, dtype=int),
+        subject_ids=np.asarray(subjects),
+        trial_ids=np.asarray(tids),
+        gesture_start=np.zeros(len(trials), dtype=int),
+        gesture_end=np.array([t.shape[0] for t in trials], dtype=int),
+        metadata=DatasetMetadata(
+            name="x",
+            version="0",
+            sampling_rate=200.0,
+            channels=[f"ch{i}" for i in range(1, 9)],
+            class_names=["a", "b", "c"],
+            content_hash="h",
+        ),
+    )
+
+
+def test_predefined_split_a1():
+    ds = _epn612_like_dataset()
+    split = split_dataset(ds, SplitConfig(strategy="predefined"))
+
+    # train = train-cohort trainingSamples (2 subjects * 2 = 4)
+    # test  = train-cohort testingSamples  (2 subjects * 2 = 4)
+    # val   = test-cohort trainingSamples  (1 subject  * 2 = 2)
+    assert split.train.n_trials == 4
+    assert split.test.n_trials == 4
+    assert split.val.n_trials == 2
+
+    assert all(":trainingSamples:" in t for t in split.train.trial_ids)
+    assert all(":testingSamples:" in t for t in split.test.trial_ids)
+    assert all(t.startswith("test:") for t in split.val.trial_ids)
+    assert all(":trainingSamples:" in t for t in split.val.trial_ids)

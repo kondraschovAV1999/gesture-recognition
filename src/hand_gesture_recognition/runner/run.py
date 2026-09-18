@@ -25,6 +25,7 @@ from hand_gesture_recognition.reporting.reporters import (
 )
 from hand_gesture_recognition.tracking.mlflow_tracker import MlflowTracker
 from hand_gesture_recognition.tracing.stage import stage
+import mlflow
 
 
 class ExperimentRunner:
@@ -44,7 +45,8 @@ class ExperimentRunner:
 
     def run(self) -> EvaluationResult:
         cfg = self.cfg
-        self.tracker.start(cfg.run_id)
+        # self.tracker.start(cfg.run_id)
+        mlflow.sklearn.autolog()
         try:
             with stage(self.logger, "load_dataset"):
                 dataset = self._load_dataset()

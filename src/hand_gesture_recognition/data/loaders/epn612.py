@@ -3,9 +3,10 @@ from __future__ import annotations
 import glob
 import json
 import os
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
+import pandas as pd
 
 from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
 from hand_gesture_recognition.data.hashing import hash_directory_cached
@@ -37,6 +38,7 @@ class EPN612Loader(DatasetLoader):
         class_names: List[str] = list(GESTURE_LABELS.keys())
         gesture_starts: List[int] = []
         gesture_ends: List[int] = []
+        subject_info_rows: Dict[str, Dict[str, Any]] = {}
 
         for f in files:
             # Derive the subject id from the full file path (cohort folder +
@@ -62,37 +64,61 @@ class EPN612Loader(DatasetLoader):
                     else dict(GESTURE_LABELS)
                 )
                 class_names = list(label_map.keys())
-            # Phase 1 loads trainingSamples only; the framework's own split
-            # strategy (subject_wise / random) creates train/val/test.
-            for key, sample in doc.get("trainingSamples", {}).items():
-                emg = sample.get("emg")
-                if not emg:
-                    continue
-                channels = sorted(emg.keys(), key=lambda c: int(c.replace("ch", "")))
-                x = np.stack(
-                    [np.asarray(emg[c], dtype=np.float32) for c in channels], axis=1
-                )
-                gesture = sample.get("gestureName", "noGesture")
-                if gesture not in label_map:
-                    continue
-                # Gesture bounds: groundTruthIndex [start, end] when present,
-                # else startPointforGestureExecution -> end of recording, else
-                # rest trial (-1, -1).
-                if gesture == "noGesture":
-                    g_start, g_end = -1, -1
-                else:
-                    gti = sample.get("groundTruthIndex")
-                    if gti is not None and len(gti) == 2:
-                        g_start, g_end = int(gti[0]), int(gti[1])
+            # User info (demographics) for later analysis.
+            ui = doc.get("userInfo", {})
+            subject_info_rows[subject_id] = {
+                "age": ui.get("age"),
+                "gender": ui.get("gender"),
+                "occupation": ui.get("occupation"),
+                "ethnic_group": ui.get("ethnicGroup"),
+                "handedness": ui.get("handedness"),
+                "arm_damage": str(ui.get("ArmDamage", "False")).lower() == "true",
+                "distance_from_elbow_to_myo_cm": ui.get("distanceFromElbowToMyoInCm"),
+                "distance_from_elbow_to_ulna_cm": ui.get("distanceFromElbowToUlnaInCm"),
+                "arm_perimeter_cm": ui.get("armPerimeterInCm"),
+                "date": ui.get("date"),
+            }
+            # Load the labeled samples. trainingSamples are always labeled. The
+            # train cohort's testingSamples are labeled too (used as the test
+            # split); the test cohort's testingSamples are unlabeled (held-out)
+            # and therefore skipped.
+            sections = ["trainingSamples"]
+            if group == "train":
+                sections.append("testingSamples")
+            for section in sections:
+                for key, sample in doc.get(section, {}).items():
+                    emg = sample.get("emg")
+                    if not emg:
+                        continue
+                    channels = sorted(
+                        emg.keys(), key=lambda c: int(c.replace("ch", ""))
+                    )
+                    x = np.stack(
+                        [np.asarray(emg[c], dtype=np.float32) for c in channels], axis=1
+                    )
+                    gesture = sample.get("gestureName")
+                    if gesture is None or gesture not in label_map:
+                        continue
+                    # Gesture bounds: groundTruthIndex [start, end] when present,
+                    # else startPointforGestureExecution -> end of recording, else
+                    # rest trial (-1, -1).
+                    if gesture == "noGesture":
+                        g_start, g_end = -1, -1
                     else:
-                        g_start = int(sample.get("startPointforGestureExecution", 0))
-                        g_end = x.shape[0]
-                trials.append(x)
-                labels.append(label_map[gesture])
-                subject_ids.append(subject_id)
-                trial_ids.append(f"{subject_id}:{key}")
-                gesture_starts.append(g_start)
-                gesture_ends.append(g_end)
+                        gti = sample.get("groundTruthIndex")
+                        if gti is not None and len(gti) == 2:
+                            g_start, g_end = int(gti[0]), int(gti[1])
+                        else:
+                            g_start = int(
+                                sample.get("startPointforGestureExecution", 0)
+                            )
+                            g_end = x.shape[0]
+                    trials.append(x)
+                    labels.append(label_map[gesture])
+                    subject_ids.append(subject_id)
+                    trial_ids.append(f"{subject_id}:{section}:{key}")
+                    gesture_starts.append(g_start)
+                    gesture_ends.append(g_end)
 
         if not trials:
             raise FileNotFoundError(
@@ -116,6 +142,7 @@ class EPN612Loader(DatasetLoader):
                 content_hash=hash_directory_cached(path),
                 provenance={"source": "EMG-EPN612", "loader": "EPN612Loader"},
             ),
+            subject_info=pd.DataFrame.from_dict(subject_info_rows, orient="index"),
         )
 
     def _discover(self, path: str) -> List[str]:
