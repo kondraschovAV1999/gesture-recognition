@@ -18,6 +18,15 @@ class Prediction:
     backend: str  # "classical" | "neural"
 
 
+@dataclass
+class PartitionPredictions:
+    """Predictions for the train/val/test partitions of a single run."""
+
+    train: Prediction
+    val: Prediction
+    test: Prediction
+
+
 class PredictionAdapter(ABC):
     @abstractmethod
     def to_prediction(self, **kwargs) -> Prediction:
