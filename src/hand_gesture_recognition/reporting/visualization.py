@@ -14,69 +14,122 @@ from hand_gesture_recognition.data.windowing.base import window_dataset
 from hand_gesture_recognition.prediction.base import Prediction
 
 
+def _channel_axes(n_channels: int):
+    fig, axes = plt.subplots(
+        n_channels, 1, figsize=(12, 1.9 * n_channels), squeeze=False
+    )
+    return fig, axes[:, 0]
+
+
+def _trial_index(dataset: Dataset, tid: str) -> int:
+    for i, t in enumerate(dataset.trial_ids.tolist()):
+        if str(t) == tid:
+            return i
+    raise KeyError(tid)
+
+
+def _shade_gesture(axes, g_start: int, g_end: int, fs: float) -> None:
+    if g_start >= 0:
+        for ax in axes:
+            ax.axvspan(g_start / fs, g_end / fs, color="green", alpha=0.2)
+
+
+def plot_raw_signal(
+    dataset: Dataset,
+    example_tid: Optional[str] = None,
+    path: Optional[str] = None,
+):
+    """One trial's raw signal: every channel on its own subplot, with the
+    ground-truth gesture segment shaded."""
+    if dataset.n_trials == 0:
+        return None
+    tid = example_tid or str(dataset.trial_ids[0])
+    i = _trial_index(dataset, tid)
+    trial = dataset.trials[i]
+    fs = dataset.metadata.sampling_rate
+    n_ch = trial.shape[1]
+
+    fig, axes = _channel_axes(n_ch)
+    t = np.arange(trial.shape[0]) / fs
+    for c in range(n_ch):
+        axes[c].plot(t, trial[:, c], lw=0.6)
+        axes[c].set_ylabel(f"ch{c + 1}")
+    _shade_gesture(axes, int(dataset.gesture_start[i]), int(dataset.gesture_end[i]), fs)
+
+    axes[0].set_title(f"raw signal — {tid}")
+    axes[-1].set_xlabel("time (s)")
+    fig.tight_layout()
+    if path:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fig.savefig(path, dpi=110)
+        plt.close(fig)
+    return fig
+
+
 def plot_predictions_on_signal(
     dataset: Dataset,
     prediction: Prediction,
     windowing,
     class_names: List[str],
+    example_tid: Optional[str] = None,
     path: Optional[str] = None,
 ):
-    """Plot one example test trial per gesture: channel-1 signal, ground-truth
-    gesture segment (green band), and per-window predicted vs expected labels
-    (green = correct, red = wrong)."""
+    """One example trial's signal, every channel on its own subplot, with the
+    ground-truth gesture segment shaded and per-window predicted labels
+    annotated on channel 1 (green = correct, red = wrong)."""
     if dataset.n_trials == 0:
         return None
     test_wd = window_dataset(dataset, windowing)
     fs = dataset.metadata.sampling_rate
     ws = test_wd.X.shape[1]
 
-    # pick the first occurrence of each gesture label
-    unique_trials = []
-    seen_labels = set()
-    trial_index = {tid: i for i, tid in enumerate(dataset.trial_ids.tolist())}
-    for i in range(dataset.n_trials):
-        label = int(dataset.labels[i])
-        if label not in seen_labels:
-            seen_labels.add(label)
-            unique_trials.append(dataset.trial_ids.tolist()[i])
+    tid = example_tid
+    if tid is None:
+        # pick the first non-noGesture trial as a meaningful example
+        for i in range(dataset.n_trials):
+            if int(dataset.labels[i]) != 0:
+                tid = str(dataset.trial_ids[i])
+                break
+        tid = tid or str(dataset.trial_ids[0])
 
-    n = len(unique_trials)
-    fig, axes = plt.subplots(n, 1, figsize=(12, 2.6 * n), squeeze=False)
-    for row, tid in enumerate(unique_trials):
-        ax = axes[row, 0]
-        i = trial_index[tid]
-        trial = dataset.trials[i]
-        g_start, g_end = int(dataset.gesture_start[i]), int(dataset.gesture_end[i])
-        true_label = int(dataset.labels[i])
-        t = np.arange(trial.shape[0]) / fs
+    i = _trial_index(dataset, tid)
+    trial = dataset.trials[i]
+    g_start, g_end = int(dataset.gesture_start[i]), int(dataset.gesture_end[i])
+    true_label = int(dataset.labels[i])
+    n_ch = trial.shape[1]
 
-        ax.plot(t, trial[:, 0], color="tab:blue", lw=0.7)
-        if g_start >= 0:
-            ax.axvspan(g_start / fs, g_end / fs, color="green", alpha=0.22)
-        ax.set_title(f"{tid} — expected: {class_names[true_label]}")
-        ax.set_xlabel("time (s)")
-        ax.set_ylabel("ch1")
+    fig, axes = _channel_axes(n_ch)
+    t = np.arange(trial.shape[0]) / fs
+    for c in range(n_ch):
+        axes[c].plot(t, trial[:, c], lw=0.6)
+        axes[c].set_ylabel(f"ch{c + 1}")
+    _shade_gesture(axes, g_start, g_end, fs)
 
-        mask = test_wd.metadata.trial_ids == tid
-        starts = test_wd.metadata.window_start[mask]
-        y_pred = prediction.y_pred[mask]
-        y_true = test_wd.y[mask]
-        ylim = ax.get_ylim()
-        for s, yp, yt in zip(starts, y_pred, y_true):
-            color = "green" if yp == yt else "red"
-            x = (s + ws / 2) / fs
-            ax.axvline(s / fs, color=color, alpha=0.25, lw=0.5)
-            ax.annotate(
-                class_names[int(yp)],
-                xy=(x, ylim[1] * 0.9),
-                color=color,
-                fontsize=6,
-                ha="center",
-                va="top",
-                rotation=90,
-            )
-        ax.set_ylim(ylim)
+    # per-window predicted labels on channel 1
+    mask = test_wd.metadata.trial_ids == tid
+    starts = test_wd.metadata.window_start[mask]
+    y_pred = prediction.y_pred[mask]
+    y_true = test_wd.y[mask]
+    ylim = axes[0].get_ylim()
+    for s, yp, yt in zip(starts, y_pred, y_true):
+        color = "green" if yp == yt else "red"
+        x = (s + ws / 2) / fs
+        axes[0].axvline(s / fs, color=color, alpha=0.3, lw=0.5)
+        axes[0].annotate(
+            class_names[int(yp)],
+            xy=(x, ylim[1] * 0.9),
+            color=color,
+            fontsize=6,
+            ha="center",
+            va="top",
+            rotation=90,
+        )
+    axes[0].set_ylim(ylim)
 
+    axes[0].set_title(
+        f"{tid} — expected: {class_names[true_label]} (green=correct, red=wrong)"
+    )
+    axes[-1].set_xlabel("time (s)")
     fig.tight_layout()
     if path:
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -95,18 +148,18 @@ def plot_signal_data_flow(
     example_tid: Optional[str] = None,
     path: Optional[str] = None,
 ):
-    """4-panel figure: raw signal, signal-processed signal, per-window
-    prediction probabilities, and expected-vs-predicted labels."""
+    """4-panel data flow: raw ch1, processed ch1, per-window prediction
+    probabilities, and expected-vs-predicted labels."""
     if test_dataset.n_trials == 0:
         return None
     tid = example_tid or str(test_dataset.trial_ids[0])
     fs = processed_dataset.metadata.sampling_rate
 
     def find_trial(ds, tid):
-        for i, t in enumerate(ds.trial_ids.tolist()):
-            if t == tid:
-                return ds.trials[i]
-        return None
+        try:
+            return ds.trials[_trial_index(ds, tid)]
+        except KeyError:
+            return None
 
     raw_trial = find_trial(raw_dataset, tid)
     proc_trial = find_trial(processed_dataset, tid)
@@ -116,13 +169,13 @@ def plot_signal_data_flow(
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
 
     if raw_trial is not None:
-        axes[0, 0].plot(np.arange(raw_trial.shape[0]) / fs, raw_trial, lw=0.6)
-    axes[0, 0].set_title("raw signal (8 channels)")
+        axes[0, 0].plot(np.arange(raw_trial.shape[0]) / fs, raw_trial[:, 0], lw=0.7)
+    axes[0, 0].set_title("raw signal (ch1)")
     axes[0, 0].set_xlabel("time (s)")
 
     if proc_trial is not None:
-        axes[0, 1].plot(np.arange(proc_trial.shape[0]) / fs, proc_trial, lw=0.6)
-    axes[0, 1].set_title("signal-processed (8 channels)")
+        axes[0, 1].plot(np.arange(proc_trial.shape[0]) / fs, proc_trial[:, 0], lw=0.7)
+    axes[0, 1].set_title("signal-processed (ch1)")
     axes[0, 1].set_xlabel("time (s)")
 
     y_score = prediction.y_score[mask] if prediction.y_score is not None else None

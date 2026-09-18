@@ -26,6 +26,15 @@ class MlflowTracker:
         mlflow.set_experiment(config.experiment_name)
 
     def start(self, run_id: str) -> None:
+        # System metrics (CPU/memory/disk) require `psutil`; enable only when
+        # available so a missing dependency never breaks the run.
+        import importlib.util
+
+        if importlib.util.find_spec("psutil") is not None:
+            try:
+                mlflow.enable_system_metrics_logging()
+            except Exception:
+                pass
         mlflow.start_run(run_name=run_id)
         self.run_id = mlflow.active_run().info.run_id
 
@@ -64,33 +73,58 @@ class MlflowTracker:
     def log_confusion_matrix(
         self, result: EvaluationResult, class_names: Optional[List[str]] = None
     ) -> None:
-        """Log the confusion matrix as a heatmap figure artifact."""
+        """Log the confusion matrix as heatmap figures (raw counts + normalized)."""
+        cm = result.confusion_matrix
+        self._log_cm_figure(cm, class_names, "confusion_matrix.png", normalize=False)
+        self._log_cm_figure(
+            cm, class_names, "confusion_matrix_normalized.png", normalize=True
+        )
+
+    @staticmethod
+    def _log_cm_figure(cm, class_names, artifact_name: str, normalize: bool) -> None:
         import matplotlib
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        import numpy as np
 
-        cm = result.confusion_matrix
         n = cm.shape[0]
         labels = class_names if class_names is not None else [str(i) for i in range(n)]
 
-        fig, ax = plt.subplots()
-        im = ax.imshow(cm, cmap="Blues")
+        if normalize:
+            row_sums = cm.sum(axis=1, keepdims=True)
+            display = cm.astype(float) / np.where(row_sums == 0, 1, row_sums)
+            title = "Confusion matrix (row-normalized)"
+            fmt = "{:.0%}"
+        else:
+            display = cm
+            title = "Confusion matrix (counts)"
+            fmt = "{:d}"
+
+        fig, ax = plt.subplots(figsize=(7, 6))
+        im = ax.imshow(display, cmap="Blues", vmin=0, vmax=1 if normalize else None)
         ax.set_xticks(range(n))
         ax.set_yticks(range(n))
         ax.set_xticklabels(labels, rotation=45, ha="right")
         ax.set_yticklabels(labels)
         ax.set_xlabel("Predicted")
         ax.set_ylabel("True")
-        ax.set_title("Confusion matrix")
-        vmax = cm.max() if cm.max() > 0 else 1
+        ax.set_title(title)
+        vmax = display.max() if display.max() > 0 else 1
         for i in range(n):
             for j in range(n):
-                color = "white" if cm[i, j] > vmax / 2 else "black"
-                ax.text(j, i, str(cm[i, j]), ha="center", va="center", color=color)
+                color = "white" if display[i, j] > vmax / 2 else "black"
+                ax.text(
+                    j,
+                    i,
+                    fmt.format(display[i, j]),
+                    ha="center",
+                    va="center",
+                    color=color,
+                )
         fig.colorbar(im)
         fig.tight_layout()
-        mlflow.log_figure(fig, "confusion_matrix.png")
+        mlflow.log_figure(fig, artifact_name)
         plt.close(fig)
 
     def log_artifact(self, local_path: str) -> None:

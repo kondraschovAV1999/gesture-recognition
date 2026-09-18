@@ -236,6 +236,7 @@ class ExperimentRunner:
             return
         from hand_gesture_recognition.reporting.visualization import (
             plot_predictions_on_signal,
+            plot_raw_signal,
             plot_signal_data_flow,
         )
 
@@ -243,13 +244,17 @@ class ExperimentRunner:
         os.makedirs(run_dir, exist_ok=True)
         class_names = processed_dataset.metadata.class_names
 
-        p1 = os.path.join(run_dir, "predictions_on_signal.png")
-        plot_predictions_on_signal(
-            test_dataset, prediction, self.cfg.windowing, class_names, path=p1
-        )
+        p1 = os.path.join(run_dir, "raw_signal.png")
+        plot_raw_signal(raw_dataset, path=p1)
         self.tracker.log_artifact(p1)
 
-        p2 = os.path.join(run_dir, "signal_data_flow.png")
+        p2 = os.path.join(run_dir, "predictions_on_signal.png")
+        plot_predictions_on_signal(
+            test_dataset, prediction, self.cfg.windowing, class_names, path=p2
+        )
+        self.tracker.log_artifact(p2)
+
+        p3 = os.path.join(run_dir, "signal_data_flow.png")
         plot_signal_data_flow(
             raw_dataset,
             processed_dataset,
@@ -257,9 +262,9 @@ class ExperimentRunner:
             prediction,
             self.cfg.windowing,
             class_names,
-            path=p2,
+            path=p3,
         )
-        self.tracker.log_artifact(p2)
+        self.tracker.log_artifact(p3)
 
     def _persist_artifacts(self, dataset, result) -> None:
         run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)
