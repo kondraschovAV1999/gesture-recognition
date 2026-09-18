@@ -160,6 +160,7 @@ class EvaluationConfig:
         default_factory=lambda: ["accuracy", "balanced_accuracy", "macro_f1"]
     )
     average: str = "macro"
+    exclude_classes: List[int] = field(default_factory=list)
 
 
 @dataclass
@@ -177,6 +178,7 @@ class TrackingConfig:
 @dataclass
 class ReportingConfig:
     formats: List[str] = field(default_factory=lambda: ["json", "html"])
+    visualize: bool = True
 
 
 @dataclass

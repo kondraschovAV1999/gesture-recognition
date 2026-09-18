@@ -52,11 +52,11 @@ class ExperimentRunner:
         mlflow.sklearn.autolog()
         try:
             with stage(self.logger, "load_dataset"):
-                dataset = self._load_dataset()
+                raw_dataset = self._load_dataset()
             with stage(self.logger, "analytics"):
-                self._analytics(dataset)
+                self._analytics(raw_dataset)
             with stage(self.logger, "signal_processing"):
-                dataset = self._signal_processing(dataset)
+                dataset = self._signal_processing(raw_dataset)
             with stage(self.logger, "split"):
                 split = split_dataset(dataset, cfg.split)
                 # Group leakage is only meaningful for group-based splits;
@@ -85,6 +85,7 @@ class ExperimentRunner:
                 self.tracker.log_params({"seed": cfg.seed, "backend": cfg.backend})
                 self.tracker.log_results(result)
                 self.tracker.log_confusion_matrix(result, dataset.metadata.class_names)
+                self._visualize(raw_dataset, dataset, split.test, prediction)
                 self._persist_artifacts(dataset, result)
             self.tracker.finish("FINISHED")
             return result
@@ -227,6 +228,38 @@ class ExperimentRunner:
             run_id=self.cfg.run_id,
             duration_s=duration,
         )
+
+    def _visualize(
+        self, raw_dataset, processed_dataset, test_dataset, prediction
+    ) -> None:
+        if not self.cfg.reporting.visualize:
+            return
+        from hand_gesture_recognition.reporting.visualization import (
+            plot_predictions_on_signal,
+            plot_signal_data_flow,
+        )
+
+        run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)
+        os.makedirs(run_dir, exist_ok=True)
+        class_names = processed_dataset.metadata.class_names
+
+        p1 = os.path.join(run_dir, "predictions_on_signal.png")
+        plot_predictions_on_signal(
+            test_dataset, prediction, self.cfg.windowing, class_names, path=p1
+        )
+        self.tracker.log_artifact(p1)
+
+        p2 = os.path.join(run_dir, "signal_data_flow.png")
+        plot_signal_data_flow(
+            raw_dataset,
+            processed_dataset,
+            test_dataset,
+            prediction,
+            self.cfg.windowing,
+            class_names,
+            path=p2,
+        )
+        self.tracker.log_artifact(p2)
 
     def _persist_artifacts(self, dataset, result) -> None:
         run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)

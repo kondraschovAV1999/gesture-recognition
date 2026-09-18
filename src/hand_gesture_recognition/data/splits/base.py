@@ -93,19 +93,22 @@ def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:
             random_state=config.seed,
         )
     elif config.strategy == "predefined":
-        # EPN612 A1 split: train = trainingJSON.trainingSamples,
-        # test = trainingJSON.testingSamples, val = testingJSON.trainingSamples.
-        # Subject ids are cohort-qualified ("train:"/"test:"); trial ids embed
-        # the sample section (":trainingSamples:" / ":testingSamples:").
+        # Subject-independent split: train/val = subject-wise split of the train
+        # cohort (trainingJSON); test = the test cohort (testingJSON), held out
+        # entirely. Gives a genuinely independent user-level test (no subject
+        # appears in more than one partition).
         sids = dataset.subject_ids.astype(str)
-        tids = dataset.trial_ids.astype(str)
-        is_train_cohort = np.char.startswith(sids, "train:")
-        is_test_cohort = np.char.startswith(sids, "test:")
-        is_training = np.char.find(tids, ":trainingSamples:") >= 0
-        is_testing = np.char.find(tids, ":testingSamples:") >= 0
-        train_idx = np.where(is_train_cohort & is_training)[0]
-        test_idx = np.where(is_train_cohort & is_testing)[0]
-        val_idx = np.where(is_test_cohort & is_training)[0]
+        is_train = np.char.startswith(sids, "train:")
+        is_test = np.char.startswith(sids, "test:")
+
+        train_subjects = np.unique(dataset.subject_ids[is_train])
+        rng.shuffle(train_subjects)
+        n_val = max(1, int(round(len(train_subjects) * config.val_ratio)))
+        val_subjects = list(train_subjects[:n_val].tolist())
+
+        train_idx = np.where(is_train & ~np.isin(dataset.subject_ids, val_subjects))[0]
+        val_idx = np.where(is_train & np.isin(dataset.subject_ids, val_subjects))[0]
+        test_idx = np.where(is_test)[0]
     else:
         raise ConfigValidationError(f"unknown strategy {config.strategy}")
 

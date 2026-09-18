@@ -42,6 +42,12 @@ def evaluate(
 ) -> EvaluationResult:
     y_true = np.asarray(prediction.y_true)
     y_pred = np.asarray(prediction.y_pred)
+    # Optionally drop samples whose TRUE label is in exclude_classes (e.g. the
+    # dominant "noGesture" class), so metrics reflect only the remaining classes.
+    if config.exclude_classes:
+        keep = ~np.isin(y_true, config.exclude_classes)
+        y_true = y_true[keep]
+        y_pred = y_pred[keep]
     metrics = {
         m: _METRIC_FNS[m](y_true, y_pred) for m in config.metrics if m in _METRIC_FNS
     }

@@ -65,9 +65,9 @@ def test_leakage_detection_raises():
 
 
 def _epn612_like_dataset():
-    """Build a dataset mimicking the EPN612 A1 structure:
-    train cohort (train:) with trainingSamples + testingSamples; test cohort
-    (test:) with trainingSamples only."""
+    """Build a dataset mimicking EPN612: a train cohort (train:) with
+    trainingSamples + testingSamples, and a test cohort (test:) with
+    trainingSamples only."""
     trials, labels, subjects, tids = [], [], [], []
     for subj in ["train:s1", "train:s2"]:
         for sec in ["trainingSamples", "testingSamples"]:
@@ -99,18 +99,19 @@ def _epn612_like_dataset():
     )
 
 
-def test_predefined_split_a1():
+def test_predefined_split_is_subject_independent():
     ds = _epn612_like_dataset()
-    split = split_dataset(ds, SplitConfig(strategy="predefined"))
+    split = split_dataset(ds, SplitConfig(strategy="predefined", seed=0))
 
-    # train = train-cohort trainingSamples (2 subjects * 2 = 4)
-    # test  = train-cohort testingSamples  (2 subjects * 2 = 4)
-    # val   = test-cohort trainingSamples  (1 subject  * 2 = 2)
-    assert split.train.n_trials == 4
-    assert split.test.n_trials == 4
-    assert split.val.n_trials == 2
+    # train + val = subject-wise split of the train cohort (train:s1, train:s2);
+    # test = the test cohort (test:s3) held out entirely.
+    assert split.train.n_trials == 4  # one train-cohort subject (4 trials)
+    assert split.val.n_trials == 4  # the other train-cohort subject
+    assert split.test.n_trials == 2  # test:s3 (2 training samples)
 
-    assert all(":trainingSamples:" in t for t in split.train.trial_ids)
-    assert all(":testingSamples:" in t for t in split.test.trial_ids)
-    assert all(t.startswith("test:") for t in split.val.trial_ids)
-    assert all(":trainingSamples:" in t for t in split.val.trial_ids)
+    assert all(s.startswith("train:") for s in set(split.train.subject_ids))
+    assert all(s.startswith("train:") for s in set(split.val.subject_ids))
+    assert all(s.startswith("test:") for s in set(split.test.subject_ids))
+
+    # genuinely independent: no subject appears in more than one partition
+    assert_no_group_leakage(split)

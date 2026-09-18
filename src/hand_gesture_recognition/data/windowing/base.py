@@ -26,6 +26,11 @@ class WindowedDataset:
 
 def window_dataset(dataset: Dataset, config: WindowingConfig) -> WindowedDataset:
     ws, stride = config.resolve(sampling_rate=dataset.metadata.sampling_rate)
+    n_channels = (
+        len(dataset.metadata.channels)
+        if dataset.metadata.channels
+        else (dataset.trials[0].shape[1] if dataset.trials else 0)
+    )
     xs: List[np.ndarray] = []
     ys: List[int] = []
     starts: List[int] = []
@@ -73,7 +78,7 @@ def window_dataset(dataset: Dataset, config: WindowingConfig) -> WindowedDataset
     return WindowedDataset(
         X=np.stack(xs, axis=0)
         if xs
-        else np.zeros((0, ws, dataset.trials[0].shape[1]), dtype=np.float32),
+        else np.zeros((0, ws, n_channels), dtype=np.float32),
         y=np.asarray(ys, dtype=int),
         metadata=WindowMetadata(
             window_start=np.asarray(starts, dtype=int),

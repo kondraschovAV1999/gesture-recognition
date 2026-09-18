@@ -63,3 +63,26 @@ def test_evaluate_computes_per_class_metrics():
     assert res.per_class["open"]["tp"] == 1
     assert res.per_class["open"]["fp"] == 1
     assert res.per_class["open"]["fn"] == 0
+
+
+def test_evaluate_exclude_classes():
+    y_true = np.array([0, 0, 0, 1, 1, 2])
+    y_pred = np.array([0, 0, 1, 1, 2, 2])
+    pred = Prediction(
+        run_id="r1",
+        sample_ids=np.arange(6),
+        y_true=y_true,
+        y_pred=y_pred,
+        y_score=np.eye(3)[y_pred],
+        prediction_duration_s=0.0,
+        backend="classical",
+    )
+    res = evaluate(
+        pred,
+        EvaluationConfig(metrics=["accuracy"], exclude_classes=[0]),
+        dataset_id="d1",
+        split_info={},
+    )
+    # true noGesture samples dropped -> y_true=[1,1,2], y_pred=[1,2,2]
+    assert res.metrics["accuracy"] == pytest.approx(2 / 3)
+    assert "0" not in res.per_class  # noGesture excluded from per-class
