@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, Dict, Optional
+
 import torch
 import torch.nn.functional as F
 from lightning.pytorch import LightningModule
@@ -9,11 +11,16 @@ class ClassifierModule(LightningModule):
     """Shared training/validation/test/predict plumbing for classifiers.
 
     Subclasses implement `forward(x) -> logits` (shape (batch, n_classes)).
+    The optimizer is built from `optimizer` config (a `_target_` dict) so the
+    optimizer type and its hyperparameters are configurable.
     """
 
-    def __init__(self, lr: float = 1e-3):
+    def __init__(self, optimizer: Optional[Dict[str, Any]] = None):
         super().__init__()
-        self.lr = lr
+        self.optimizer_config = optimizer or {
+            "_target_": "torch.optim.Adam",
+            "lr": 1e-3,
+        }
 
     def _step(self, batch, prefix: str) -> torch.Tensor:
         x, y = batch
@@ -39,4 +46,10 @@ class ClassifierModule(LightningModule):
         return self(x)  # logits
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+        from hydra.utils import instantiate
+
+        # Bind the optimizer's config args first (_partial_), then pass the
+        # runtime `params` directly (avoids OmegaConf trying to convert the
+        # parameter generator).
+        opt_partial = instantiate(self.optimizer_config, _partial_=True)
+        return opt_partial(self.parameters())

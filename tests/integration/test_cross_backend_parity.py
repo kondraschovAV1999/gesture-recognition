@@ -58,9 +58,7 @@ def _neural_prediction(split, windowing):
     n_channels = len(split.train.metadata.channels)
     n_classes = len(split.train.metadata.class_names)
     dm = EMGDataModule(split=split, windowing=windowing, batch_size=32)
-    model = DNNModule(
-        n_channels=n_channels, n_classes=n_classes, hidden_dims=(16,), lr=1e-3
-    )
+    model = DNNModule(n_channels=n_channels, n_classes=n_classes, hidden_dims=(16,))
     trainer = pl.Trainer(
         max_epochs=1,
         accelerator="cpu",

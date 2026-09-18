@@ -131,9 +131,16 @@ class NeuralConfig:
         default_factory=lambda: {
             "_target_": "hand_gesture_recognition.neural.models.dnn.DNNModule",
             "hidden_dims": [128, 64],
-            "lr": 1e-3,
         }
     )
+    optimizer: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "_target_": "torch.optim.Adam",
+            "lr": 1e-3,
+            "weight_decay": 0.0,
+        }
+    )
+    early_stopping: Optional[Dict[str, Any]] = None
     trainer: Dict[str, Any] = field(
         default_factory=lambda: {
             "_target_": "lightning.pytorch.Trainer",

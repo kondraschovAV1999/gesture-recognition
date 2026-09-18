@@ -57,6 +57,19 @@ def test_lstm_forward_shape():
     assert logits.shape == (4, 3)
 
 
+def test_optimizer_is_configurable():
+    model = DNNModule(
+        n_channels=8,
+        n_classes=3,
+        hidden_dims=(16,),
+        optimizer={"_target_": "torch.optim.SGD", "lr": 0.1, "momentum": 0.9},
+    )
+    opt = model.configure_optimizers()
+    assert isinstance(opt, torch.optim.SGD)
+    assert opt.defaults["lr"] == 0.1
+    assert opt.defaults["momentum"] == 0.9
+
+
 def test_lightning_adapter_softmax_argmax():
     wd = WindowedDataset(
         X=np.zeros((4, 40, 8), dtype=np.float32),

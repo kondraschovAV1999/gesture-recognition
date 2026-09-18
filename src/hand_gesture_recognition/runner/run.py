@@ -176,10 +176,23 @@ class ExperimentRunner:
         # the runtime objects directly (avoids OmegaConf trying to convert them).
         dm_partial = instantiate(self.cfg.neural.datamodule, _partial_=True)
         datamodule = dm_partial(split=split, windowing=self.cfg.windowing)
-        model = instantiate(
-            self.cfg.neural.model, n_channels=n_channels, n_classes=n_classes
+        # The optimizer config carries its own `_target_`; passing it through
+        # instantiate would trigger recursive instantiation (Adam() without
+        # params). Use _partial_ and pass it as a plain arg at call time.
+        model_partial = instantiate(
+            self.cfg.neural.model,
+            n_channels=n_channels,
+            n_classes=n_classes,
+            _partial_=True,
         )
-        trainer = instantiate(self.cfg.neural.trainer)
+        model = model_partial(optimizer=self.cfg.neural.optimizer)
+        # Early stopping callback (optional); passed as a runtime object, so
+        # build the Trainer via _partial_ and pass callbacks at call time.
+        callbacks = None
+        if self.cfg.neural.early_stopping:
+            callbacks = [instantiate(self.cfg.neural.early_stopping)]
+        trainer_partial = instantiate(self.cfg.neural.trainer, _partial_=True)
+        trainer = trainer_partial(callbacks=callbacks)
 
         t0 = time.perf_counter()
         trainer.fit(model, datamodule=datamodule)

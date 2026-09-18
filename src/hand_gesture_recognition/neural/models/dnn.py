@@ -20,9 +20,9 @@ class DNNModule(ClassifierModule):
         n_channels: int,
         n_classes: int,
         hidden_dims: List[int] = (128, 64),
-        lr: float = 1e-3,
+        optimizer=None,
     ):
-        super().__init__(lr=lr)
+        super().__init__(optimizer=optimizer)
         layers: list = [nn.Flatten(), nn.LazyLinear(hidden_dims[0]), nn.ReLU()]
         for i in range(1, len(hidden_dims)):
             layers.append(nn.Linear(hidden_dims[i - 1], hidden_dims[i]))
