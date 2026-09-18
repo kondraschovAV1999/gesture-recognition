@@ -46,6 +46,7 @@ def _coerce(d: Dict[str, Any]) -> ExperimentConfig:
         dataset=DatasetConfig(**d.get("dataset", {})),
         split=SplitConfig(**d.get("split", {})),
         windowing=WindowingConfig(**d.get("windowing", {})),
+        signal_processing=list(d.get("signal_processing", [])),
         classical=ClassicalConfig(**d.get("classical", {})),
         neural=NeuralConfig(**d.get("neural", {})),
         evaluation=EvaluationConfig(**d.get("evaluation", {})),

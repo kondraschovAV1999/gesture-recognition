@@ -189,6 +189,7 @@ class ExperimentConfig:
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     split: SplitConfig = field(default_factory=SplitConfig)
     windowing: WindowingConfig = field(default_factory=WindowingConfig)
+    signal_processing: List[Dict[str, Any]] = field(default_factory=list)
     classical: ClassicalConfig = field(default_factory=ClassicalConfig)
     neural: NeuralConfig = field(default_factory=NeuralConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)

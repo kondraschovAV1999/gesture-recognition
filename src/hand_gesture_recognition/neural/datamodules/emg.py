@@ -26,12 +26,16 @@ class EMGDataModule(LightningDataModule):
         windowing: WindowingConfig,
         batch_size: int = 32,
         num_workers: int = 0,
+        shuffle: bool = False,
     ):
         super().__init__()
         self.split = split
         self.windowing = windowing
         self.batch_size = batch_size
         self.num_workers = num_workers
+        # Windows are kept in temporal order (shuffle=False) — only subjects
+        # are randomized (at the split stage), never windows.
+        self.shuffle = shuffle
         self._train: Optional[TensorDataset] = None
         self._val: Optional[TensorDataset] = None
         self._test: Optional[TensorDataset] = None
@@ -51,7 +55,7 @@ class EMGDataModule(LightningDataModule):
         return DataLoader(
             self._train,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=self.shuffle,
             num_workers=self.num_workers,
         )
 

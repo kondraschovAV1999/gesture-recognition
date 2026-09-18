@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import time
 import uuid
+from dataclasses import replace
 from datetime import datetime
 
 from hydra.utils import instantiate
@@ -45,13 +46,17 @@ class ExperimentRunner:
 
     def run(self) -> EvaluationResult:
         cfg = self.cfg
-        # self.tracker.start(cfg.run_id)
+        self.tracker.start(cfg.run_id)
+        # Auto-log the trained sklearn model/params into the active run
+        # (classical backend); the tracker still owns the run lifecycle.
         mlflow.sklearn.autolog()
         try:
             with stage(self.logger, "load_dataset"):
                 dataset = self._load_dataset()
             with stage(self.logger, "analytics"):
                 self._analytics(dataset)
+            with stage(self.logger, "signal_processing"):
+                dataset = self._signal_processing(dataset)
             with stage(self.logger, "split"):
                 split = split_dataset(dataset, cfg.split)
                 # Group leakage is only meaningful for group-based splits;
@@ -96,6 +101,18 @@ class ExperimentRunner:
         # process runs from the repo root).
         return loader.load(resolve_path(self.cfg.dataset.path))
 
+    def _signal_processing(self, dataset):
+        # Deterministic signal processing (rectify, filters, envelope) applied
+        # to the raw continuous signal BEFORE splitting — safe since it learns
+        # nothing from the data.
+        if not self.cfg.signal_processing:
+            return dataset
+        steps = [instantiate(step_cfg) for step_cfg in self.cfg.signal_processing]
+        trials = dataset.trials
+        for step in steps:
+            trials = [step.transform(t) for t in trials]
+        return replace(dataset, trials=trials)
+
     def _analytics(self, dataset) -> None:
         if not self.cfg.analytics.enabled:
             return
@@ -124,14 +141,14 @@ class ExperimentRunner:
         train_wd = windower.fit_transform(train)
         test_wd = windower.transform(test)
 
-        # handcrafted features (3D -> 2D), then preprocessing (scaler, fit on
-        # train only) — both constructed via hydra.utils.instantiate (ADR #18).
+        # Learned preprocessing (3D, fit on train only) then feature extraction
+        # (3D -> 2D) — both via hydra.utils.instantiate (ADR #18).
         X_train, X_test = train_wd.X, test_wd.X
-        for step_cfg in self.cfg.classical.features:
+        for step_cfg in self.cfg.classical.preprocessing:
             step = instantiate(step_cfg)
             X_train = step.fit_transform(X_train)
             X_test = step.transform(X_test)
-        for step_cfg in self.cfg.classical.preprocessing:
+        for step_cfg in self.cfg.classical.features:
             step = instantiate(step_cfg)
             X_train = step.fit_transform(X_train)
             X_test = step.transform(X_test)

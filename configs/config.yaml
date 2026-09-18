@@ -2,6 +2,7 @@ defaults:
   - dataset: epn612
   - split: subject_wise
   - windowing: default
+  - signal_processing: none
   - classical: random_forest
   - neural: dnn
   - evaluation: basic

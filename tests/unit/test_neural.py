@@ -5,7 +5,11 @@ import torch
 from hand_gesture_recognition.configuration.schema import SplitConfig, WindowingConfig
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.data.splits.base import split_dataset
-from hand_gesture_recognition.data.windowing.base import WindowMetadata, WindowedDataset
+from hand_gesture_recognition.data.windowing.base import (
+    WindowMetadata,
+    WindowedDataset,
+    window_dataset,
+)
 from hand_gesture_recognition.neural.adapters.lightning import (
     LightningPredictionAdapter,
 )
@@ -43,6 +47,20 @@ def test_emg_datamodule_windows_via_shared_impl():
     assert X_batch.ndim == 3
     assert X_batch.shape[1:] == (40, 8)
     assert X_batch.shape[0] == y_batch.shape[0]
+
+
+def test_emg_datamodule_preserves_temporal_order():
+    windowing = WindowingConfig(window_size_samples=40, stride_samples=20)
+    dm = EMGDataModule(
+        split=_split(), windowing=windowing, batch_size=1000, shuffle=False
+    )
+    dm.setup()
+    X_batch, y_batch = next(iter(dm.train_dataloader()))
+    # with shuffle=False and a batch >= all windows, the single batch must be
+    # the exact temporal order produced by the shared window_dataset
+    wd = window_dataset(_split().train, windowing)
+    assert np.array_equal(X_batch.numpy(), wd.X)
+    assert np.array_equal(y_batch.numpy(), wd.y)
 
 
 def test_dnn_forward_shape():
