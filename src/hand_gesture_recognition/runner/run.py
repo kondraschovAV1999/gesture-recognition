@@ -10,7 +10,6 @@ from hydra.utils import instantiate
 
 from hand_gesture_recognition.configuration.loader import save_resolved_config
 from hand_gesture_recognition.configuration.schema import ExperimentConfig
-from hand_gesture_recognition.prediction.base import PartitionPredictions, Prediction
 from hand_gesture_recognition.classical.adapters.sklearn import SklearnPredictionAdapter
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.data.splits.base import (
@@ -20,6 +19,7 @@ from hand_gesture_recognition.data.splits.base import (
 from hand_gesture_recognition.evaluation.base import EvaluationResult, evaluate
 from hand_gesture_recognition.logging_setup.config import get_logger
 from hand_gesture_recognition.paths import resolve_path
+from hand_gesture_recognition.prediction.base import PartitionPredictions, Prediction
 from hand_gesture_recognition.reporting.reporters import (
     HtmlReporter,
     JsonReporter,

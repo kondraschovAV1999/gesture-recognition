@@ -68,7 +68,7 @@ def plot_raw_signal(
 
 def plot_raw_signal_by_class(
     dataset: Dataset, run_dir: str, class_names: Optional[List[str]] = None
-):
+) -> List[str]:
     """Write one raw-signal figure per class present in the dataset.
 
     Returns the list of file paths written (for artifact logging). Classes with

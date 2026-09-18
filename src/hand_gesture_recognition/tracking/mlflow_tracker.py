@@ -57,7 +57,7 @@ class MlflowTracker:
     def log_results(
         self, result: EvaluationResult, partition: Optional[str] = None
     ) -> None:
-        prefix = f"{partition}_" if partition else ""
+        prefix = f"{partition}_" if partition is not None else ""
         if result.metrics:
             mlflow.log_metrics({f"{prefix}{k}": v for k, v in result.metrics.items()})
         # Per-class precision/recall/F1 + confusion-matrix components are only

@@ -1,5 +1,3 @@
-import os
-
 import mlflow
 
 from hand_gesture_recognition.configuration.loader import load_config

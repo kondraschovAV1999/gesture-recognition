@@ -82,3 +82,4 @@ def test_log_confusion_matrix_empty_skips(tmp_path):
     client = mlflow.tracking.MlflowClient(tracking_uri=str(tmp_path / "mlruns"))
     artifacts = [a.path for a in client.list_artifacts(t.run_id)]
     assert "confusion_matrix_train.png" not in artifacts
+    assert "confusion_matrix_train_normalized.png" not in artifacts
