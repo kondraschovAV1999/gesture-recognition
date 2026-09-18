@@ -66,6 +66,30 @@ def plot_raw_signal(
     return fig
 
 
+def plot_raw_signal_by_class(
+    dataset: Dataset, run_dir: str, class_names: Optional[List[str]] = None
+):
+    """Write one raw-signal figure per class present in the dataset.
+
+    Returns the list of file paths written (for artifact logging). Classes with
+    no trials in this dataset are naturally absent (skipped by iterating over
+    the unique labels actually present).
+    """
+    paths: List[str] = []
+    if dataset.n_trials == 0:
+        return paths
+    names = class_names if class_names is not None else dataset.metadata.class_names
+    for cls in np.unique(dataset.labels):
+        cls = int(cls)
+        idx = np.where(dataset.labels == cls)[0]
+        tid = str(dataset.trial_ids[idx[0]])
+        name = names[cls] if cls < len(names) else str(cls)
+        path = os.path.join(run_dir, f"raw_signal_{name}.png")
+        plot_raw_signal(dataset, example_tid=tid, path=path)
+        paths.append(path)
+    return paths
+
+
 def plot_predictions_on_signal(
     dataset: Dataset,
     prediction: Prediction,
