@@ -10,6 +10,7 @@ from hydra.utils import instantiate
 
 from hand_gesture_recognition.configuration.loader import save_resolved_config
 from hand_gesture_recognition.configuration.schema import ExperimentConfig
+from hand_gesture_recognition.prediction.base import PartitionPredictions, Prediction
 from hand_gesture_recognition.classical.adapters.sklearn import SklearnPredictionAdapter
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.data.splits.base import (
@@ -70,26 +71,32 @@ class ExperimentRunner:
                     assert_no_group_leakage(split)
             with stage(self.logger, "train"):
                 if cfg.backend == "classical":
-                    prediction = self._train_and_predict_classical(
-                        split.train, split.test
-                    )
+                    predictions = self._train_and_predict_classical(split)
                 else:
-                    prediction = self._train_and_predict_neural(split)
+                    predictions = self._train_and_predict_neural(split)
             with stage(self.logger, "evaluate"):
-                result = evaluate(
-                    prediction,
-                    cfg.evaluation,
-                    dataset_id=dataset.metadata.name,
-                    split_info={"strategy": cfg.split.strategy},
-                    class_names=dataset.metadata.class_names,
-                )
-            self.logger.info(f"Evaluation metrics: {result.metrics}")
+                results = {}
+                for part in ("train", "val", "test"):
+                    results[part] = evaluate(
+                        getattr(predictions, part),
+                        cfg.evaluation,
+                        dataset_id=dataset.metadata.name,
+                        split_info={"strategy": cfg.split.strategy},
+                        class_names=dataset.metadata.class_names,
+                    )
+                result = results["test"]
+                self.logger.info(f"Evaluation metrics: {result.metrics}")
             with stage(self.logger, "track_and_report"):
                 self.tracker.log_dataset(dataset)
                 self.tracker.log_params({"seed": cfg.seed, "backend": cfg.backend})
-                self.tracker.log_results(result)
-                self.tracker.log_confusion_matrix(result, dataset.metadata.class_names)
-                self._visualize(raw_dataset, dataset, split.test, prediction)
+                for part, r in results.items():
+                    self.tracker.log_results(
+                        r, partition=(None if part == "test" else part)
+                    )
+                    self.tracker.log_confusion_matrix(
+                        r, dataset.metadata.class_names, partition=part
+                    )
+                self._visualize(raw_dataset, dataset, split, predictions)
                 self._persist_artifacts(dataset, result)
             self.tracker.finish("FINISHED")
             return result
@@ -136,45 +143,56 @@ class ExperimentRunner:
                 json.dump(run_quality_checks(dataset), f, indent=2)
             plot_class_distribution(dataset, os.path.join(d, "class_distribution.png"))
 
-    def _train_and_predict_classical(self, train, test):
+    def _train_and_predict_classical(self, split) -> PartitionPredictions:
         from hand_gesture_recognition.classical.pipelines.windowing import (
             WindowingTransformer,
         )
 
         # shared windowing via the spec-mandated sklearn wrapper (Section 6.2)
         windower = WindowingTransformer(self.cfg.windowing)
-        train_wd = windower.fit_transform(train)
-        test_wd = windower.transform(test)
+        train_wd = windower.fit_transform(split.train)
+        val_wd = windower.transform(split.val)
+        test_wd = windower.transform(split.test)
 
         # Learned preprocessing (3D, fit on train only) then feature extraction
         # (3D -> 2D) — both via hydra.utils.instantiate (ADR #18).
-        X_train, X_test = train_wd.X, test_wd.X
+        X_train, X_val, X_test = train_wd.X, val_wd.X, test_wd.X
         for step_cfg in self.cfg.classical.preprocessing:
             step = instantiate(step_cfg)
             X_train = step.fit_transform(X_train)
+            X_val = step.transform(X_val)
             X_test = step.transform(X_test)
         for step_cfg in self.cfg.classical.features:
             step = instantiate(step_cfg)
             X_train = step.fit_transform(X_train)
+            X_val = step.transform(X_val)
             X_test = step.transform(X_test)
 
         model = instantiate(self.cfg.classical.model)
         t0 = time.perf_counter()
         model.fit(X_train, train_wd.y)
-        y_pred = model.predict(X_test)
-        y_score = model.predict_proba(X_test)
-        duration = time.perf_counter() - t0
 
         adapter = SklearnPredictionAdapter()
-        return adapter.to_prediction(
-            windowed=test_wd,
-            y_pred=y_pred,
-            y_score=y_score,
-            run_id=self.cfg.run_id,
-            duration_s=duration,
-        )
 
-    def _train_and_predict_neural(self, split):
+        def build(wd, X) -> Prediction:
+            return adapter.to_prediction(
+                windowed=wd,
+                y_pred=model.predict(X),
+                y_score=model.predict_proba(X),
+                run_id=self.cfg.run_id,
+                duration_s=0.0,
+            )
+
+        train_p = build(train_wd, X_train)
+        val_p = build(val_wd, X_val)
+        test_p = build(test_wd, X_test)
+        duration = time.perf_counter() - t0
+        train_p.prediction_duration_s = duration
+        val_p.prediction_duration_s = duration
+        test_p.prediction_duration_s = duration
+        return PartitionPredictions(train=train_p, val=val_p, test=test_p)
+
+    def _train_and_predict_neural(self, split) -> PartitionPredictions:
         import logging
 
         import lightning.pytorch as pl
@@ -218,57 +236,86 @@ class ExperimentRunner:
 
         t0 = time.perf_counter()
         trainer.fit(model, datamodule=datamodule)
-        raw = trainer.predict(model, datamodule=datamodule)
+        train_raw = trainer.predict(model, dataloaders=datamodule.train_dataloader())
+        val_raw = trainer.predict(model, dataloaders=datamodule.val_dataloader())
+        test_raw = trainer.predict(model, dataloaders=datamodule.test_dataloader())
         duration = time.perf_counter() - t0
 
-        # Window the test partition (same shared windowing) to recover the
-        # per-window metadata + y_true for the Prediction.
+        # Window each partition (same shared windowing) to recover per-window
+        # metadata + y_true for the Prediction.
+        train_wd = window_dataset(split.train, self.cfg.windowing)
+        val_wd = window_dataset(split.val, self.cfg.windowing)
         test_wd = window_dataset(split.test, self.cfg.windowing)
 
         adapter = LightningPredictionAdapter()
-        return adapter.to_prediction(
-            windowed=test_wd,
-            raw_predictions=raw,
-            run_id=self.cfg.run_id,
-            duration_s=duration,
+        return PartitionPredictions(
+            train=adapter.to_prediction(
+                windowed=train_wd,
+                raw_predictions=train_raw,
+                run_id=self.cfg.run_id,
+                duration_s=duration,
+            ),
+            val=adapter.to_prediction(
+                windowed=val_wd,
+                raw_predictions=val_raw,
+                run_id=self.cfg.run_id,
+                duration_s=duration,
+            ),
+            test=adapter.to_prediction(
+                windowed=test_wd,
+                raw_predictions=test_raw,
+                run_id=self.cfg.run_id,
+                duration_s=duration,
+            ),
         )
 
-    def _visualize(
-        self, raw_dataset, processed_dataset, test_dataset, prediction
-    ) -> None:
+    def _visualize(self, raw_dataset, processed_dataset, split, predictions) -> None:
         if not self.cfg.reporting.visualize:
             return
         from hand_gesture_recognition.reporting.visualization import (
             plot_predictions_on_signal,
-            plot_raw_signal,
+            plot_raw_signal_by_class,
             plot_signal_data_flow,
+            plot_signal_processing_comparison,
         )
 
         run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)
         os.makedirs(run_dir, exist_ok=True)
         class_names = processed_dataset.metadata.class_names
 
-        p1 = os.path.join(run_dir, "raw_signal.png")
-        plot_raw_signal(raw_dataset, path=p1)
-        self.tracker.log_artifact(p1)
+        # raw signal per class (6 for EPN612; N for synthetic)
+        for p in plot_raw_signal_by_class(raw_dataset, run_dir, class_names):
+            self.tracker.log_artifact(p)
 
-        p2 = os.path.join(run_dir, "predictions_on_signal.png")
-        plot_predictions_on_signal(
-            test_dataset, prediction, self.cfg.windowing, class_names, path=p2
-        )
-        self.tracker.log_artifact(p2)
+        # predictions on signal: validation + test
+        for part, ds, pred in (
+            ("val", split.val, predictions.val),
+            ("test", split.test, predictions.test),
+        ):
+            p = os.path.join(run_dir, f"predictions_on_signal_{part}.png")
+            plot_predictions_on_signal(
+                ds, pred, self.cfg.windowing, class_names, path=p
+            )
+            self.tracker.log_artifact(p)
 
-        p3 = os.path.join(run_dir, "signal_data_flow.png")
+        # before/after signal processing (only when processing was applied)
+        if self.cfg.signal_processing:
+            p = os.path.join(run_dir, "signal_processing_comparison.png")
+            plot_signal_processing_comparison(raw_dataset, processed_dataset, path=p)
+            self.tracker.log_artifact(p)
+
+        # existing 4-panel data flow (test partition)
+        p = os.path.join(run_dir, "signal_data_flow.png")
         plot_signal_data_flow(
             raw_dataset,
             processed_dataset,
-            test_dataset,
-            prediction,
+            split.test,
+            predictions.test,
             self.cfg.windowing,
             class_names,
-            path=p3,
+            path=p,
         )
-        self.tracker.log_artifact(p3)
+        self.tracker.log_artifact(p)
 
     def _persist_artifacts(self, dataset, result) -> None:
         run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)
