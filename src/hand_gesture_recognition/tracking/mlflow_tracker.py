@@ -54,31 +54,39 @@ class MlflowTracker:
             }
         )
 
-    def log_results(self, result: EvaluationResult) -> None:
-        mlflow.log_metrics(result.metrics)
-        # Per-class precision/recall/F1 + confusion-matrix components.
-        for cls, cls_metrics in result.per_class.items():
-            mlflow.log_metrics(
-                {
-                    f"precision_{cls}": cls_metrics.get("precision", 0.0),
-                    f"recall_{cls}": cls_metrics.get("recall", 0.0),
-                    f"f1_{cls}": cls_metrics.get("f1", 0.0),
-                    f"tp_{cls}": cls_metrics.get("tp", 0),
-                    f"fp_{cls}": cls_metrics.get("fp", 0),
-                    f"tn_{cls}": cls_metrics.get("tn", 0),
-                    f"fn_{cls}": cls_metrics.get("fn", 0),
-                }
-            )
+    def log_results(
+        self, result: EvaluationResult, partition: Optional[str] = None
+    ) -> None:
+        prefix = f"{partition}_" if partition else ""
+        if result.metrics:
+            mlflow.log_metrics({f"{prefix}{k}": v for k, v in result.metrics.items()})
+        # Per-class precision/recall/F1 + confusion-matrix components are only
+        # logged for the primary (test) result; train/val rely on their CMs.
+        if partition is None:
+            for cls, cls_metrics in result.per_class.items():
+                mlflow.log_metrics(
+                    {
+                        f"precision_{cls}": cls_metrics.get("precision", 0.0),
+                        f"recall_{cls}": cls_metrics.get("recall", 0.0),
+                        f"f1_{cls}": cls_metrics.get("f1", 0.0),
+                        f"tp_{cls}": cls_metrics.get("tp", 0),
+                        f"fp_{cls}": cls_metrics.get("fp", 0),
+                        f"tn_{cls}": cls_metrics.get("tn", 0),
+                        f"fn_{cls}": cls_metrics.get("fn", 0),
+                    }
+                )
 
     def log_confusion_matrix(
-        self, result: EvaluationResult, class_names: Optional[List[str]] = None
+        self,
+        result: EvaluationResult,
+        class_names: Optional[List[str]] = None,
+        partition: str = "test",
     ) -> None:
         """Log the confusion matrix as heatmap figures (raw counts + normalized)."""
         cm = result.confusion_matrix
-        self._log_cm_figure(cm, class_names, "confusion_matrix.png", normalize=False)
-        self._log_cm_figure(
-            cm, class_names, "confusion_matrix_normalized.png", normalize=True
-        )
+        base = f"confusion_matrix_{partition}"
+        self._log_cm_figure(cm, class_names, f"{base}.png", normalize=False)
+        self._log_cm_figure(cm, class_names, f"{base}_normalized.png", normalize=True)
 
     @staticmethod
     def _log_cm_figure(cm, class_names, artifact_name: str, normalize: bool) -> None:
@@ -87,6 +95,9 @@ class MlflowTracker:
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
+
+        if cm.size == 0:
+            return
 
         n = cm.shape[0]
         labels = class_names if class_names is not None else [str(i) for i in range(n)]
