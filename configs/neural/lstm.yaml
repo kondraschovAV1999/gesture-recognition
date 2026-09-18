@@ -21,8 +21,8 @@ early_stopping: null
 trainer:
   _target_: lightning.pytorch.Trainer
   max_epochs: 5
-  accelerator: cpu
-  enable_progress_bar: false
-  enable_model_summary: false
+  accelerator: auto
+  enable_progress_bar: true
+  enable_model_summary: true
   enable_checkpointing: false
-  logger: false
+  logger: true

@@ -147,7 +147,7 @@ model:
 trainer:
   _target_: lightning.pytorch.Trainer
   max_epochs: 5
-  accelerator: cpu
+  accelerator: auto   # GPU when available, else CPU
   enable_checkpointing: false
 ```
 

@@ -145,7 +145,7 @@ class NeuralConfig:
         default_factory=lambda: {
             "_target_": "lightning.pytorch.Trainer",
             "max_epochs": 5,
-            "accelerator": "cpu",
+            "accelerator": "auto",
             "enable_progress_bar": False,
             "enable_model_summary": False,
             "enable_checkpointing": False,
