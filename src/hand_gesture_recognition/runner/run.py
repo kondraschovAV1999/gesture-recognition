@@ -49,7 +49,11 @@ class ExperimentRunner:
         self.tracker.start(cfg.run_id)
         # Auto-log the trained sklearn model/params into the active run
         # (classical backend); the tracker still owns the run lifecycle.
-        mlflow.sklearn.autolog()
+        if cfg.backend == "classical":
+            mlflow.sklearn.autolog()
+        else:
+            mlflow.pytorch.autolog()
+
         try:
             with stage(self.logger, "load_dataset"):
                 raw_dataset = self._load_dataset()

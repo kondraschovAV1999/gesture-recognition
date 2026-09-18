@@ -4,7 +4,7 @@ defaults:
   - windowing: default
   - signal_processing: emg
   - classical: random_forest
-  - neural: dnn
+  - neural: lstm
   - evaluation: basic
   - analytics: basic
   - experiment: default
