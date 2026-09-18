@@ -24,8 +24,9 @@ configs/
 ├── dataset/                 # dataset loaders
 ├── split/                   # split strategies
 ├── windowing/               # window size/stride
-├── classical/               # classical features/preprocessing/model
-├── neural/                  # neural datamodule/model/trainer
+├── signal_processing/       # deterministic signal transforms (before split)
+├── classical/               # classical preprocessing/features/model
+├── neural/                  # neural datamodule/optimizer/model/trainer
 ├── evaluation/              # metrics
 ├── analytics/               # analytics flags
 └── experiment/              # backend, seed, tracking, reporting
@@ -91,6 +92,17 @@ python -m hand_gesture_recognition --mode compose split.strategy=predefined
 `data/splits/base.py` (add a `elif config.strategy == "..."` branch that
 computes `train_idx`/`val_idx`/`test_idx`) and register the name in
 `SplitConfig.validate()`.
+
+## Signal processing (deterministic, before split)
+
+`configs/signal_processing/` holds presets (e.g. `emg.yaml` = bandpass + notch
++ rectify). Select with `signal_processing=emg` (default `none`). Components
+live in `src/preprocessing/signal.py` (`RectifyTransformer`,
+`ButterworthFilter`, `EnvelopeExtractor`); learned preprocessing lives in
+`src/preprocessing/learned.py` (`PerChannelStandardScaler`). To add a signal
+transform, subclass `sklearn.base.BaseEstimator, TransformerMixin` with
+`transform(X) -> X` (operating on `(time, channels)` or `(windows, time,
+channels)` along `axis=-2`) and reference it in the `signal_processing` list.
 
 ## Switching a classical model
 
