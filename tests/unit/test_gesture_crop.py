@@ -77,3 +77,21 @@ def test_crop_preserves_labels_and_ids():
     assert np.array_equal(out.trial_ids, ds.trial_ids)
     assert np.array_equal(out.subject_ids, ds.subject_ids)
     assert out.metadata is ds.metadata
+
+
+from hand_gesture_recognition.configuration.loader import load_config
+from hand_gesture_recognition.runner.run import ExperimentRunner
+
+
+def test_runner_gesture_crop_respects_flag(tmp_path):
+    cfg = load_config(mode="compose", overrides=["dataset.name=synthetic"])
+    cfg.tracking.tracking_uri = str(tmp_path / "mlruns")
+    runner = ExperimentRunner(cfg)
+    ds = _dataset()
+
+    cfg.gesture_crop.enabled = False
+    assert runner._gesture_crop(ds) is ds
+
+    cfg.gesture_crop.enabled = True
+    cropped = runner._gesture_crop(ds)
+    assert cropped.trials[0].shape[0] == 300

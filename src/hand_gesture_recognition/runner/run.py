@@ -60,8 +60,10 @@ class ExperimentRunner:
                 raw_dataset = self._load_dataset()
             with stage(self.logger, "analytics"):
                 self._analytics(raw_dataset)
+            with stage(self.logger, "gesture_crop"):
+                cropped = self._gesture_crop(raw_dataset)
             with stage(self.logger, "signal_processing"):
-                dataset = self._signal_processing(raw_dataset)
+                dataset = self._signal_processing(cropped)
             with stage(self.logger, "split"):
                 split = split_dataset(dataset, cfg.split)
                 # Group leakage is only meaningful for group-based splits;
@@ -96,7 +98,7 @@ class ExperimentRunner:
                     self.tracker.log_confusion_matrix(
                         r, dataset.metadata.class_names, partition=part
                     )
-                self._visualize(raw_dataset, dataset, split, predictions)
+                self._visualize(cropped, dataset, split, predictions)
                 self._persist_artifacts(dataset, result)
             self.tracker.finish("FINISHED")
             return result
@@ -124,6 +126,13 @@ class ExperimentRunner:
         for step in steps:
             trials = [step.transform(t) for t in trials]
         return replace(dataset, trials=trials)
+
+    def _gesture_crop(self, dataset):
+        if not self.cfg.gesture_crop.enabled:
+            return dataset
+        from hand_gesture_recognition.data.gesture_crop import crop_to_gesture
+
+        return crop_to_gesture(dataset, self.cfg.gesture_crop)
 
     def _analytics(self, dataset) -> None:
         if not self.cfg.analytics.enabled:
