@@ -47,7 +47,10 @@ def _classical_prediction(split, windowing):
 def _neural_prediction(split, windowing):
     import lightning.pytorch as pl
 
-    from hand_gesture_recognition.data.windowing.base import window_dataset
+    from hand_gesture_recognition.data.windowing.base import (
+        WindowedPartitions,
+        window_dataset,
+    )
     from hand_gesture_recognition.neural.adapters.lightning import (
         LightningPredictionAdapter,
     )
@@ -57,7 +60,12 @@ def _neural_prediction(split, windowing):
     pl.seed_everything(0, workers=True)
     n_channels = len(split.train.metadata.channels)
     n_classes = len(split.train.metadata.class_names)
-    dm = EMGDataModule(split=split, windowing=windowing, batch_size=32)
+    windowed = WindowedPartitions(
+        train=window_dataset(split.train, windowing),
+        val=window_dataset(split.val, windowing),
+        test=window_dataset(split.test, windowing),
+    )
+    dm = EMGDataModule(windowed=windowed, batch_size=32)
     model = DNNModule(n_channels=n_channels, n_classes=n_classes, hidden_dims=(16,))
     trainer = pl.Trainer(
         max_epochs=1,
@@ -69,9 +77,8 @@ def _neural_prediction(split, windowing):
     )
     trainer.fit(model, datamodule=dm)
     raw = trainer.predict(model, datamodule=dm)
-    test_wd = window_dataset(split.test, windowing)
     return LightningPredictionAdapter().to_prediction(
-        windowed=test_wd, raw_predictions=raw, run_id="parity", duration_s=0.0
+        raw_predictions=raw, run_id="parity", duration_s=0.0
     )
 
 

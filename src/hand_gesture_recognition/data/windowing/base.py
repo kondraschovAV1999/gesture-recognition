@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List
 
 import numpy as np
@@ -15,9 +15,7 @@ class WindowMetadata:
     window_end: np.ndarray  # (n_windows,)
     subject_ids: np.ndarray  # (n_windows,)
     trial_ids: np.ndarray  # (n_windows,)
-    window_ids: np.ndarray = field(
-        default_factory=lambda: np.asarray([], dtype=str)
-    )  # (n_windows,) unique, traceable to trial
+    window_ids: np.ndarray  # (n_windows,) unique, traceable to trial
 
 
 @dataclass

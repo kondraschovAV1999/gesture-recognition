@@ -19,7 +19,7 @@ class SklearnPredictionAdapter(PredictionAdapter):
     ) -> Prediction:
         return Prediction(
             run_id=run_id,
-            sample_ids=windowed.metadata.trial_ids,
+            sample_ids=windowed.metadata.window_ids,
             y_true=windowed.y,
             y_pred=np.asarray(y_pred),
             y_score=y_score,

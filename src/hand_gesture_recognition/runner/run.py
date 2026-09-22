@@ -16,6 +16,7 @@ from hand_gesture_recognition.data.splits.base import (
     assert_no_group_leakage,
     split_dataset,
 )
+from hand_gesture_recognition.data.windowing.base import WindowedPartitions
 from hand_gesture_recognition.evaluation.base import EvaluationResult, evaluate
 from hand_gesture_recognition.logging_setup.config import get_logger
 from hand_gesture_recognition.paths import resolve_path
@@ -71,11 +72,15 @@ class ExperimentRunner:
                 # partitions (the smoke test uses strategy=random).
                 if cfg.split.strategy in ("subject_wise", "session_wise", "predefined"):
                     assert_no_group_leakage(split)
+            with stage(self.logger, "windowing"):
+                windowed = self._window(split)
             with stage(self.logger, "train"):
                 if cfg.backend == "classical":
-                    predictions = self._train_and_predict_classical(split)
+                    predictions = self._train_and_predict_classical(windowed)
                 else:
-                    predictions = self._train_and_predict_neural(split)
+                    predictions = self._train_and_predict_neural(
+                        windowed, n_classes=len(dataset.metadata.class_names)
+                    )
             with stage(self.logger, "evaluate"):
                 results = {}
                 for part in ("train", "val", "test"):
@@ -152,20 +157,22 @@ class ExperimentRunner:
                 json.dump(run_quality_checks(dataset), f, indent=2)
             plot_class_distribution(dataset, os.path.join(d, "class_distribution.png"))
 
-    def _train_and_predict_classical(self, split) -> PartitionPredictions:
-        from hand_gesture_recognition.classical.pipelines.windowing import (
-            WindowingTransformer,
+    def _window(self, split) -> WindowedPartitions:
+        from hand_gesture_recognition.data.windowing.base import (
+            WindowedPartitions,
+            window_dataset,
         )
 
-        # shared windowing via the spec-mandated sklearn wrapper (Section 6.2)
-        windower = WindowingTransformer(self.cfg.windowing)
-        train_wd = windower.fit_transform(split.train)
-        val_wd = windower.transform(split.val)
-        test_wd = windower.transform(split.test)
+        return WindowedPartitions(
+            train=window_dataset(split.train, self.cfg.windowing),
+            val=window_dataset(split.val, self.cfg.windowing),
+            test=window_dataset(split.test, self.cfg.windowing),
+        )
 
-        # Learned preprocessing (3D, fit on train only) then feature extraction
-        # (3D -> 2D) — both via hydra.utils.instantiate (ADR #18).
-        X_train, X_val, X_test = train_wd.X, val_wd.X, test_wd.X
+    def _train_and_predict_classical(
+        self, windowed: WindowedPartitions
+    ) -> PartitionPredictions:
+        X_train, X_val, X_test = windowed.train.X, windowed.val.X, windowed.test.X
         for step_cfg in self.cfg.classical.preprocessing:
             step = instantiate(step_cfg)
             X_train = step.fit_transform(X_train)
@@ -179,7 +186,7 @@ class ExperimentRunner:
 
         model = instantiate(self.cfg.classical.model)
         t0 = time.perf_counter()
-        model.fit(X_train, train_wd.y)
+        model.fit(X_train, windowed.train.y)
 
         adapter = SklearnPredictionAdapter()
 
@@ -192,21 +199,22 @@ class ExperimentRunner:
                 duration_s=0.0,
             )
 
-        train_p = build(train_wd, X_train)
-        val_p = build(val_wd, X_val)
-        test_p = build(test_wd, X_test)
+        train_p = build(windowed.train, X_train)
+        val_p = build(windowed.val, X_val)
+        test_p = build(windowed.test, X_test)
         duration = time.perf_counter() - t0
         train_p.prediction_duration_s = duration
         val_p.prediction_duration_s = duration
         test_p.prediction_duration_s = duration
         return PartitionPredictions(train=train_p, val=val_p, test=test_p)
 
-    def _train_and_predict_neural(self, split) -> PartitionPredictions:
+    def _train_and_predict_neural(
+        self, windowed: WindowedPartitions, n_classes: int
+    ) -> PartitionPredictions:
         import logging
 
         import lightning.pytorch as pl
 
-        from hand_gesture_recognition.data.windowing.base import window_dataset
         from hand_gesture_recognition.neural.adapters.lightning import (
             LightningPredictionAdapter,
         )
@@ -217,14 +225,13 @@ class ExperimentRunner:
 
         pl.seed_everything(self.cfg.seed, workers=True)
 
-        n_channels = len(split.train.metadata.channels)
-        n_classes = len(split.train.metadata.class_names)
+        n_channels = windowed.train.X.shape[-1]
 
-        # The DataModule's split/windowing args are runtime objects (containing
-        # numpy arrays), so bind the config args via _partial_ first, then pass
-        # the runtime objects directly (avoids OmegaConf trying to convert them).
+        # The DataModule's windowed args are runtime objects (containing numpy
+        # arrays), so bind the config args via _partial_ first, then pass the
+        # runtime objects directly (avoids OmegaConf trying to convert them).
         dm_partial = instantiate(self.cfg.neural.datamodule, _partial_=True)
-        datamodule = dm_partial(split=split, windowing=self.cfg.windowing)
+        datamodule = dm_partial(windowed=windowed)
         # The optimizer config carries its own `_target_`; passing it through
         # instantiate would trigger recursive instantiation (Adam() without
         # params). Use _partial_ and pass it as a plain arg at call time.
@@ -250,28 +257,19 @@ class ExperimentRunner:
         test_raw = trainer.predict(model, dataloaders=datamodule.test_dataloader())
         duration = time.perf_counter() - t0
 
-        # Window each partition (same shared windowing) to recover per-window
-        # metadata + y_true for the Prediction.
-        train_wd = window_dataset(split.train, self.cfg.windowing)
-        val_wd = window_dataset(split.val, self.cfg.windowing)
-        test_wd = window_dataset(split.test, self.cfg.windowing)
-
         adapter = LightningPredictionAdapter()
         return PartitionPredictions(
             train=adapter.to_prediction(
-                windowed=train_wd,
                 raw_predictions=train_raw,
                 run_id=self.cfg.run_id,
                 duration_s=duration,
             ),
             val=adapter.to_prediction(
-                windowed=val_wd,
                 raw_predictions=val_raw,
                 run_id=self.cfg.run_id,
                 duration_s=duration,
             ),
             test=adapter.to_prediction(
-                windowed=test_wd,
                 raw_predictions=test_raw,
                 run_id=self.cfg.run_id,
                 duration_s=duration,

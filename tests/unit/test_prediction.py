@@ -14,6 +14,7 @@ def _windowed(n=10):
             window_end=np.arange(n) + 40,
             subject_ids=np.array([f"s{i % 2}" for i in range(n)]),
             trial_ids=np.array([f"t{i}" for i in range(n)]),
+            window_ids=np.array([f"s{i % 2}_t{i}_window0" for i in range(n)]),
         ),
     )
 
@@ -30,7 +31,7 @@ def test_sklearn_adapter_builds_prediction():
     )
     assert pred.backend == "classical"
     assert pred.run_id == "r1"
-    assert pred.sample_ids.tolist() == [f"t{i}" for i in range(10)]
+    assert pred.sample_ids.tolist() == [f"s{i % 2}_t{i}_window0" for i in range(10)]
     assert pred.y_true.tolist() == (np.arange(10) % 3).tolist()
     assert pred.y_score.shape == (10, 3)
 
