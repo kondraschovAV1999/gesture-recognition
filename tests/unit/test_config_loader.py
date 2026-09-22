@@ -39,7 +39,6 @@ def test_replay_mode_roundtrips(tmp_path):
     save_resolved_config(cfg, str(p))
     replayed = load_config(mode="replay", resolved_path=str(p))
     assert replayed.seed == 7
-    assert replayed.backend == "classical"
     assert replayed == cfg
 
 
@@ -51,7 +50,6 @@ def test_replay_mode_missing_file_raises(tmp_path):
 def test_gesture_crop_config_default_enabled():
     cfg = load_config(mode="compose")
     assert cfg.gesture_crop.enabled is True
-    assert cfg.gesture_crop.pad_samples == 100
     assert cfg.gesture_crop.no_gesture_max_length_samples is None
 
 

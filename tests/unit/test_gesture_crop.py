@@ -93,5 +93,6 @@ def test_runner_gesture_crop_respects_flag(tmp_path):
     assert runner._gesture_crop(ds) is ds
 
     cfg.gesture_crop.enabled = True
+    cfg.gesture_crop.pad_samples = 100  # explicit, independent of the config default
     cropped = runner._gesture_crop(ds)
     assert cropped.trials[0].shape[0] == 300
