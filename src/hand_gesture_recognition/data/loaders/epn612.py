@@ -38,7 +38,9 @@ class EPN612Loader(DatasetLoader):
 
     def load(self, path: str) -> Dataset:
         files = self._discover(path)
-        if self.max_train_users is not None or self.max_test_users is not None:
+        if self.subjects is None and (
+            self.max_train_users is not None or self.max_test_users is not None
+        ):
             self._sample_users(files, path)
         trials: List[np.ndarray] = []
         labels: List[int] = []
@@ -185,8 +187,6 @@ class EPN612Loader(DatasetLoader):
 
         allowed = {f"train:{u}" for u in sample(train_dirs, self.max_train_users)}
         allowed |= {f"test:{u}" for u in sample(test_dirs, self.max_test_users)}
-        if self.subjects is not None:
-            allowed &= self.subjects
         self.subjects = allowed
 
     def _discover(self, path: str) -> List[str]:

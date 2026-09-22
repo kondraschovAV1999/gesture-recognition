@@ -172,3 +172,12 @@ def test_epn612_loader_max_users_clamps(tmp_path):
         _write_user(tmp_path, "trainingJSON", uid)
     ds = EPN612Loader(max_train_users=10, user_seed=42).load(str(tmp_path))
     assert len({s for s in ds.subject_ids.tolist() if s.startswith("train:")}) == 3
+
+
+def test_epn612_loader_subjects_precedence_over_max_users(tmp_path):
+    for uid in range(1, 4):
+        _write_user(tmp_path, "trainingJSON", uid)
+    ds = EPN612Loader(subjects=["train:user1"], max_train_users=2, user_seed=42).load(
+        str(tmp_path)
+    )
+    assert set(ds.subject_ids.tolist()) == {"train:user1"}

@@ -53,6 +53,14 @@ def evaluate(
     }
     cm = confusion_matrix(y_true, y_pred)
     classes = np.unique(np.concatenate([y_true, y_pred]))
+    # A full-size confusion matrix aligned to the known class set (zero rows and
+    # columns for absent classes) so plotting/reporting can label every class.
+    # Per-class metrics below still use the compact matrix aligned to `classes`.
+    cm_full = (
+        confusion_matrix(y_true, y_pred, labels=np.arange(len(class_names)))
+        if class_names is not None
+        else cm
+    )
     precision, recall, f1, _ = precision_recall_fscore_support(
         y_true, y_pred, labels=classes, average=None, zero_division=0
     )
@@ -83,5 +91,5 @@ def evaluate(
         split=split_info,
         metrics=metrics,
         per_class=per_class,
-        confusion_matrix=cm,
+        confusion_matrix=cm_full,
     )
