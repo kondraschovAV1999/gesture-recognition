@@ -46,3 +46,15 @@ def test_replay_mode_roundtrips(tmp_path):
 def test_replay_mode_missing_file_raises(tmp_path):
     with pytest.raises(ConfigReplayError):
         load_config(mode="replay", resolved_path=str(tmp_path / "nope.yaml"))
+
+
+def test_gesture_crop_config_default_enabled():
+    cfg = load_config(mode="compose")
+    assert cfg.gesture_crop.enabled is True
+    assert cfg.gesture_crop.pad_samples == 100
+    assert cfg.gesture_crop.no_gesture_max_length_samples is None
+
+
+def test_gesture_crop_config_can_be_disabled():
+    cfg = load_config(mode="compose", overrides=["gesture_crop=none"])
+    assert cfg.gesture_crop.enabled is False

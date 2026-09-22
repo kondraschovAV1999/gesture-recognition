@@ -65,6 +65,13 @@ class WindowingConfig:
 
 
 @dataclass
+class GestureCropConfig:
+    enabled: bool = False
+    pad_samples: int = 100  # symmetric context kept before AND after the gesture
+    no_gesture_max_length_samples: Optional[int] = None  # None = auto-derive
+
+
+@dataclass
 class DatasetConfig:
     name: str = "epn612"
     path: str = "resources/data/EPN612"
@@ -192,6 +199,7 @@ class ExperimentConfig:
     split: SplitConfig = field(default_factory=SplitConfig)
     windowing: WindowingConfig = field(default_factory=WindowingConfig)
     signal_processing: List[Dict[str, Any]] = field(default_factory=list)
+    gesture_crop: GestureCropConfig = field(default_factory=GestureCropConfig)
     classical: ClassicalConfig = field(default_factory=ClassicalConfig)
     neural: NeuralConfig = field(default_factory=NeuralConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)

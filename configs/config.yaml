@@ -3,6 +3,7 @@ defaults:
   - split: subject_wise
   - windowing: default
   - signal_processing: emg
+  - gesture_crop: default
   - classical: random_forest
   - neural: lstm
   - evaluation: basic

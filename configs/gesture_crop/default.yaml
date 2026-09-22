@@ -1,0 +1,3 @@
+# @package gesture_crop
+enabled: true
+pad_samples: 100
