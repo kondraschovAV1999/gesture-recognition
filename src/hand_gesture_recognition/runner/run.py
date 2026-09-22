@@ -20,7 +20,7 @@ from hand_gesture_recognition.data.windowing.base import WindowedPartitions
 from hand_gesture_recognition.evaluation.base import EvaluationResult, evaluate
 from hand_gesture_recognition.logging_setup.config import get_logger
 from hand_gesture_recognition.paths import resolve_path
-from hand_gesture_recognition.prediction.base import PartitionPredictions, Prediction
+from hand_gesture_recognition.prediction.base import PartitionPredictions
 from hand_gesture_recognition.reporting.reporters import (
     HtmlReporter,
     JsonReporter,
@@ -185,28 +185,48 @@ class ExperimentRunner:
             X_test = step.transform(X_test)
 
         model = instantiate(self.cfg.classical.model)
-        t0 = time.perf_counter()
         model.fit(X_train, windowed.train.y)
 
         adapter = SklearnPredictionAdapter()
 
-        def build(wd, X) -> Prediction:
-            return adapter.to_prediction(
-                windowed=wd,
-                y_pred=model.predict(X),
-                y_score=model.predict_proba(X),
-                run_id=self.cfg.run_id,
-                duration_s=0.0,
-            )
+        t0 = time.perf_counter()
+        y_train_pred = model.predict(X_train)
+        y_train_score = model.predict_proba(X_train)
+        train_duration = time.perf_counter() - t0
 
-        train_p = build(windowed.train, X_train)
-        val_p = build(windowed.val, X_val)
-        test_p = build(windowed.test, X_test)
-        duration = time.perf_counter() - t0
-        train_p.prediction_duration_s = duration
-        val_p.prediction_duration_s = duration
-        test_p.prediction_duration_s = duration
-        return PartitionPredictions(train=train_p, val=val_p, test=test_p)
+        t0 = time.perf_counter()
+        y_val_pred = model.predict(X_val)
+        y_val_score = model.predict_proba(X_val)
+        val_duration = time.perf_counter() - t0
+
+        t0 = time.perf_counter()
+        y_test_pred = model.predict(X_test)
+        y_test_score = model.predict_proba(X_test)
+        test_duration = time.perf_counter() - t0
+
+        return PartitionPredictions(
+            train=adapter.to_prediction(
+                windowed=windowed.train,
+                y_pred=y_train_pred,
+                y_score=y_train_score,
+                run_id=self.cfg.run_id,
+                duration_s=train_duration,
+            ),
+            val=adapter.to_prediction(
+                windowed=windowed.val,
+                y_pred=y_val_pred,
+                y_score=y_val_score,
+                run_id=self.cfg.run_id,
+                duration_s=val_duration,
+            ),
+            test=adapter.to_prediction(
+                windowed=windowed.test,
+                y_pred=y_test_pred,
+                y_score=y_test_score,
+                run_id=self.cfg.run_id,
+                duration_s=test_duration,
+            ),
+        )
 
     def _train_and_predict_neural(
         self, windowed: WindowedPartitions, n_classes: int
@@ -250,29 +270,40 @@ class ExperimentRunner:
         trainer_partial = instantiate(self.cfg.neural.trainer, _partial_=True)
         trainer = trainer_partial(callbacks=callbacks)
 
-        t0 = time.perf_counter()
         trainer.fit(model, datamodule=datamodule)
-        train_raw = trainer.predict(model, dataloaders=datamodule.train_dataloader())
-        val_raw = trainer.predict(model, dataloaders=datamodule.val_dataloader())
-        test_raw = trainer.predict(model, dataloaders=datamodule.test_dataloader())
-        duration = time.perf_counter() - t0
+
+        t0 = time.perf_counter()
+        y_train_pred_raw = trainer.predict(
+            model, dataloaders=datamodule.train_dataloader()
+        )
+        train_duration = time.perf_counter() - t0
+
+        t0 = time.perf_counter()
+        y_val_pred_raw = trainer.predict(model, dataloaders=datamodule.val_dataloader())
+        val_duration = time.perf_counter() - t0
+
+        t0 = time.perf_counter()
+        y_test_pred_raw = trainer.predict(
+            model, dataloaders=datamodule.test_dataloader()
+        )
+        test_duration = time.perf_counter() - t0
 
         adapter = LightningPredictionAdapter()
         return PartitionPredictions(
             train=adapter.to_prediction(
-                raw_predictions=train_raw,
+                raw_predictions=y_train_pred_raw,
                 run_id=self.cfg.run_id,
-                duration_s=duration,
+                duration_s=train_duration,
             ),
             val=adapter.to_prediction(
-                raw_predictions=val_raw,
+                raw_predictions=y_val_pred_raw,
                 run_id=self.cfg.run_id,
-                duration_s=duration,
+                duration_s=val_duration,
             ),
             test=adapter.to_prediction(
-                raw_predictions=test_raw,
+                raw_predictions=y_test_pred_raw,
                 run_id=self.cfg.run_id,
-                duration_s=duration,
+                duration_s=test_duration,
             ),
         )
 
