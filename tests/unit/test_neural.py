@@ -6,6 +6,7 @@ from hand_gesture_recognition.configuration.schema import SplitConfig, Windowing
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.data.splits.base import split_dataset
 from hand_gesture_recognition.data.windowing.base import (
+    WindowedPartitions,
     WindowMetadata,
     WindowedDataset,
     window_dataset,
@@ -13,12 +14,15 @@ from hand_gesture_recognition.data.windowing.base import (
 from hand_gesture_recognition.neural.adapters.lightning import (
     LightningPredictionAdapter,
 )
-from hand_gesture_recognition.neural.datamodules.emg import EMGDataModule
+from hand_gesture_recognition.neural.datamodules.emg import (
+    EMGDataModule,
+    EMGWindowDataset,
+)
 from hand_gesture_recognition.neural.models.dnn import DNNModule
 from hand_gesture_recognition.neural.models.lstm import LSTMModule
 
 
-def _split():
+def _windowed_partitions():
     ds = make_synthetic_dataset(
         n_subjects=4,
         n_trials_per_subject=4,
@@ -27,40 +31,76 @@ def _split():
         n_classes=3,
         seed=0,
     )
-    return split_dataset(
+    split = split_dataset(
         ds,
         SplitConfig(
             strategy="random", train_ratio=0.6, val_ratio=0.2, test_ratio=0.2, seed=0
         ),
     )
-
-
-def test_emg_datamodule_windows_via_shared_impl():
-    dm = EMGDataModule(
-        split=_split(),
-        windowing=WindowingConfig(window_size_samples=40, stride_samples=20),
-        batch_size=8,
-    )
-    dm.setup()
-    X_batch, y_batch = next(iter(dm.train_dataloader()))
-    # windows preserve (time, channels) — the neural model adapts downstream
-    assert X_batch.ndim == 3
-    assert X_batch.shape[1:] == (40, 8)
-    assert X_batch.shape[0] == y_batch.shape[0]
-
-
-def test_emg_datamodule_preserves_temporal_order():
     windowing = WindowingConfig(window_size_samples=40, stride_samples=20)
-    dm = EMGDataModule(
-        split=_split(), windowing=windowing, batch_size=1000, shuffle=False
+    return WindowedPartitions(
+        train=window_dataset(split.train, windowing),
+        val=window_dataset(split.val, windowing),
+        test=window_dataset(split.test, windowing),
     )
+
+
+def test_emg_datamodule_does_not_re_window():
+    wp = _windowed_partitions()
+    dm = EMGDataModule(windowed=wp, batch_size=8)
     dm.setup()
-    X_batch, y_batch = next(iter(dm.train_dataloader()))
-    # with shuffle=False and a batch >= all windows, the single batch must be
-    # the exact temporal order produced by the shared window_dataset
-    wd = window_dataset(_split().train, windowing)
-    assert np.array_equal(X_batch.numpy(), wd.X)
-    assert np.array_equal(y_batch.numpy(), wd.y)
+    X = next(iter(dm.train_dataloader()))
+    # batch is a dict carrying metadata
+    assert isinstance(X, dict)
+    assert set(X.keys()) == {
+        "x",
+        "y_true",
+        "window_id",
+        "trial_id",
+        "subject_id",
+        "window_start",
+        "window_end",
+    }
+    assert X["x"].shape[1:] == (40, 8)
+
+
+def test_emg_window_dataset_returns_metadata_dict():
+    wp = _windowed_partitions()
+    ds = EMGWindowDataset(wp.train)
+    item = ds[0]
+    assert item["x"].shape == (40, 8)
+    assert item["y_true"].ndim == 0
+    assert isinstance(item["window_id"], str)
+    assert isinstance(item["trial_id"], str)
+
+
+def test_lightning_adapter_reads_metadata_from_predict_output():
+    logits = torch.tensor([[3.0, 0.0, 0.0], [0.0, 3.0, 0.0], [0.0, 0.0, 3.0]])
+    y = torch.tensor([0, 1, 2])
+    raw = [
+        {
+            "logits": logits[:2],
+            "y_true": y[:2],
+            "window_id": ("w0", "w1"),
+            "trial_id": ("t0", "t1"),
+            "subject_id": ("s1", "s1"),
+        },
+        {
+            "logits": logits[2:],
+            "y_true": y[2:],
+            "window_id": ("w2",),
+            "trial_id": ("t0",),
+            "subject_id": ("s1",),
+        },
+    ]
+    pred = LightningPredictionAdapter().to_prediction(
+        raw_predictions=raw, run_id="r", duration_s=0.1
+    )
+    assert pred.backend == "neural"
+    assert pred.sample_ids.tolist() == ["w0", "w1", "w2"]
+    assert pred.y_true.tolist() == [0, 1, 2]
+    assert pred.y_pred.tolist() == [0, 1, 2]
+    assert pred.y_score.shape == (3, 3)
 
 
 def test_dnn_forward_shape():
@@ -86,33 +126,3 @@ def test_optimizer_is_configurable():
     assert isinstance(opt, torch.optim.SGD)
     assert opt.defaults["lr"] == 0.1
     assert opt.defaults["momentum"] == 0.9
-
-
-def test_lightning_adapter_softmax_argmax():
-    wd = WindowedDataset(
-        X=np.zeros((4, 40, 8), dtype=np.float32),
-        y=np.array([0, 1, 2, 1]),
-        metadata=WindowMetadata(
-            window_start=np.arange(4),
-            window_end=np.arange(4) + 40,
-            subject_ids=np.array(["s1"] * 4),
-            trial_ids=np.array(["t0", "t1", "t2", "t3"]),
-        ),
-    )
-    logits = torch.tensor(
-        [
-            [3.0, 0.0, 0.0],
-            [0.0, 3.0, 0.0],
-            [0.0, 0.0, 3.0],
-            [0.0, 3.0, 0.0],
-        ]
-    )
-    pred = LightningPredictionAdapter().to_prediction(
-        windowed=wd, raw_predictions=[logits], run_id="r", duration_s=0.1
-    )
-    assert pred.backend == "neural"
-    assert pred.y_pred.tolist() == [0, 1, 2, 1]
-    assert pred.y_score.shape == (4, 3)
-    assert pred.y_score[0, 0] == pytest.approx(0.909, abs=1e-2)  # softmax of [3,0,0]
-    assert np.array_equal(pred.y_true, wd.y)
-    assert pred.sample_ids.tolist() == ["t0", "t1", "t2", "t3"]

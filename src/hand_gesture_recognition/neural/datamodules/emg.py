@@ -4,52 +4,58 @@ from typing import Optional
 
 import torch
 from lightning.pytorch import LightningDataModule
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, Dataset
 
-from hand_gesture_recognition.configuration.schema import WindowingConfig
-from hand_gesture_recognition.data.splits.base import DataSplit
-from hand_gesture_recognition.data.windowing.base import WindowedDataset, window_dataset
+from hand_gesture_recognition.data.windowing.base import (
+    WindowedDataset,
+    WindowedPartitions,
+)
+
+
+class EMGWindowDataset(Dataset):
+    """Maps a `WindowedDataset` to a torch Dataset whose items carry metadata."""
+
+    def __init__(self, windowed: WindowedDataset):
+        self.windowed = windowed
+
+    def __len__(self):
+        return len(self.windowed.y)
+
+    def __getitem__(self, idx):
+        return {
+            "x": torch.as_tensor(self.windowed.X[idx], dtype=torch.float32),
+            "y_true": torch.as_tensor(self.windowed.y[idx], dtype=torch.long),
+            "window_id": self.windowed.metadata.window_ids[idx],
+            "trial_id": self.windowed.metadata.trial_ids[idx],
+            "subject_id": self.windowed.metadata.subject_ids[idx],
+            "window_start": self.windowed.metadata.window_start[idx],
+            "window_end": self.windowed.metadata.window_end[idx],
+        }
 
 
 class EMGDataModule(LightningDataModule):
-    """LightningDataModule that windows the split via the SHARED windowing impl.
-
-    The framework split (train/val/test Dataset) is windowed once per partition
-    by calling `window_dataset` (no second windowing implementation), then
-    wrapped into `TensorDataset`s. Model-agnostic: always yields
-    `(batch, time, channels)`.
-    """
+    """Wraps already-windowed partitions into DataLoaders (no windowing here)."""
 
     def __init__(
         self,
-        split: DataSplit,
-        windowing: WindowingConfig,
+        windowed: WindowedPartitions,
         batch_size: int = 32,
         num_workers: int = 0,
         shuffle: bool = False,
     ):
         super().__init__()
-        self.split = split
-        self.windowing = windowing
+        self.windowed = windowed
         self.batch_size = batch_size
         self.num_workers = num_workers
-        # Windows are kept in temporal order (shuffle=False) — only subjects
-        # are randomized (at the split stage), never windows.
         self.shuffle = shuffle
-        self._train: Optional[TensorDataset] = None
-        self._val: Optional[TensorDataset] = None
-        self._test: Optional[TensorDataset] = None
+        self._train: Optional[Dataset] = None
+        self._val: Optional[Dataset] = None
+        self._test: Optional[Dataset] = None
 
     def setup(self, stage: Optional[str] = None) -> None:
-        self._train = self._to_dataset(window_dataset(self.split.train, self.windowing))
-        self._val = self._to_dataset(window_dataset(self.split.val, self.windowing))
-        self._test = self._to_dataset(window_dataset(self.split.test, self.windowing))
-
-    @staticmethod
-    def _to_dataset(wd: WindowedDataset) -> TensorDataset:
-        X = torch.tensor(wd.X, dtype=torch.float32)
-        y = torch.tensor(wd.y, dtype=torch.long)
-        return TensorDataset(X, y)
+        self._train = EMGWindowDataset(self.windowed.train)
+        self._val = EMGWindowDataset(self.windowed.val)
+        self._test = EMGWindowDataset(self.windowed.test)
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(

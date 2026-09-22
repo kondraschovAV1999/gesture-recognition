@@ -23,7 +23,8 @@ class ClassifierModule(LightningModule):
         }
 
     def _step(self, batch, prefix: str) -> torch.Tensor:
-        x, y = batch
+        x = batch["x"]
+        y = batch["y_true"]
         logits = self(x)
         loss = F.cross_entropy(logits, y)
         preds = logits.argmax(dim=1)
@@ -42,8 +43,15 @@ class ClassifierModule(LightningModule):
         return self._step(batch, "test")
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        x, _ = batch
-        return self(x)  # logits
+        x = batch["x"]
+        logits = self(x)
+        return {
+            "logits": logits,
+            "y_true": batch["y_true"],
+            "window_id": batch["window_id"],
+            "trial_id": batch["trial_id"],
+            "subject_id": batch["subject_id"],
+        }
 
     def configure_optimizers(self):
         from hydra.utils import instantiate
