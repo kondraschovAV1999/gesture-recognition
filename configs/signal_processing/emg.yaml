@@ -2,7 +2,7 @@
 - _target_: hand_gesture_recognition.preprocessing.signal.ButterworthFilter
   type: bandpass
   lowcut: 10
-  highcut: 100
+  highcut: 95
   order: 5
   fs: 200
 - _target_: hand_gesture_recognition.preprocessing.signal.ButterworthFilter
