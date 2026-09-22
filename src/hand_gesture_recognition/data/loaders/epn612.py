@@ -23,12 +23,23 @@ GESTURE_LABELS = {
 
 
 class EPN612Loader(DatasetLoader):
-    def __init__(self, subjects: Optional[Iterable[str]] = None):
+    def __init__(
+        self,
+        subjects: Optional[Iterable[str]] = None,
+        max_train_users: Optional[int] = None,
+        max_test_users: Optional[int] = None,
+        user_seed: int = 42,
+    ):
         # subjects are cohort-qualified ids, e.g. "train:user1" / "test:user3"
         self.subjects = set(subjects) if subjects is not None else None
+        self.max_train_users = max_train_users
+        self.max_test_users = max_test_users
+        self.user_seed = user_seed
 
     def load(self, path: str) -> Dataset:
         files = self._discover(path)
+        if self.max_train_users is not None or self.max_test_users is not None:
+            self._sample_users(files, path)
         trials: List[np.ndarray] = []
         labels: List[int] = []
         subject_ids: List[str] = []
@@ -144,6 +155,39 @@ class EPN612Loader(DatasetLoader):
             ),
             subject_info=pd.DataFrame.from_dict(subject_info_rows, orient="index"),
         )
+
+    def _sample_users(self, files: List[str], path: str) -> None:
+        """Restrict `self.subjects` to a seeded-random sample per cohort."""
+        rng = np.random.default_rng(self.user_seed)
+        train_dirs: set = set()
+        test_dirs: set = set()
+        for f in files:
+            rel = os.path.relpath(f, path)
+            parts = rel.split(os.sep)
+            cohort_dir = parts[0] if parts else ""
+            subject_dir = parts[1] if len(parts) > 1 else ""
+            if "training" in cohort_dir.lower():
+                train_dirs.add(subject_dir)
+            else:
+                test_dirs.add(subject_dir)
+        train_dirs = sorted(train_dirs)
+        test_dirs = sorted(test_dirs)
+
+        def sample(dirs, n):
+            if n is None:
+                return set(dirs)
+            k = min(n, len(dirs))
+            return set(
+                rng.choice(
+                    np.asarray(dirs, dtype=object), size=k, replace=False
+                ).tolist()
+            )
+
+        allowed = {f"train:{u}" for u in sample(train_dirs, self.max_train_users)}
+        allowed |= {f"test:{u}" for u in sample(test_dirs, self.max_test_users)}
+        if self.subjects is not None:
+            allowed &= self.subjects
+        self.subjects = allowed
 
     def _discover(self, path: str) -> List[str]:
         pattern = os.path.join(path, "**", "user*.json")

@@ -144,3 +144,31 @@ def test_epn612_loader_skips_unlabeled_testing_samples(tmp_path):
     ds = EPN612Loader().load(str(tmp_path))
     assert ds.n_trials == 3  # only trainingSamples (3)
     assert all(":trainingSamples:" in t for t in ds.trial_ids)
+
+
+def test_epn612_loader_max_users_sampling(tmp_path):
+    for uid in range(1, 6):
+        _write_user(tmp_path, "trainingJSON", uid)
+    for uid in range(1, 5):
+        _write_user(tmp_path, "testingJSON", uid)
+    ds = EPN612Loader(max_train_users=2, max_test_users=2, user_seed=42).load(
+        str(tmp_path)
+    )
+    sids = set(ds.subject_ids.tolist())
+    assert len({s for s in sids if s.startswith("train:")}) == 2
+    assert len({s for s in sids if s.startswith("test:")}) == 2
+
+
+def test_epn612_loader_max_users_reproducible(tmp_path):
+    for uid in range(1, 8):
+        _write_user(tmp_path, "trainingJSON", uid)
+    a = EPN612Loader(max_train_users=3, user_seed=7).load(str(tmp_path))
+    b = EPN612Loader(max_train_users=3, user_seed=7).load(str(tmp_path))
+    assert set(a.subject_ids.tolist()) == set(b.subject_ids.tolist())
+
+
+def test_epn612_loader_max_users_clamps(tmp_path):
+    for uid in range(1, 4):
+        _write_user(tmp_path, "trainingJSON", uid)
+    ds = EPN612Loader(max_train_users=10, user_seed=42).load(str(tmp_path))
+    assert len({s for s in ds.subject_ids.tolist() if s.startswith("train:")}) == 3
