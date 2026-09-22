@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
 import numpy as np
@@ -15,6 +15,9 @@ class WindowMetadata:
     window_end: np.ndarray  # (n_windows,)
     subject_ids: np.ndarray  # (n_windows,)
     trial_ids: np.ndarray  # (n_windows,)
+    window_ids: np.ndarray = field(
+        default_factory=lambda: np.asarray([], dtype=str)
+    )  # (n_windows,) unique, traceable to trial
 
 
 @dataclass
@@ -22,6 +25,15 @@ class WindowedDataset:
     X: np.ndarray  # (n_windows, window_size, channels)
     y: np.ndarray  # (n_windows,)
     metadata: WindowMetadata
+
+
+@dataclass
+class WindowedPartitions:
+    """The single authoritative windowed representation of train/val/test."""
+
+    train: WindowedDataset
+    val: WindowedDataset
+    test: WindowedDataset
 
 
 def window_dataset(dataset: Dataset, config: WindowingConfig) -> WindowedDataset:
@@ -37,6 +49,7 @@ def window_dataset(dataset: Dataset, config: WindowingConfig) -> WindowedDataset
     ends: List[int] = []
     subjects: List[str] = []
     trials: List[str] = []
+    wins: List[str] = []
 
     for trial, label, subj, tid, g_start, g_end in zip(
         dataset.trials,
@@ -74,6 +87,7 @@ def window_dataset(dataset: Dataset, config: WindowingConfig) -> WindowedDataset
             ends.append(e)
             subjects.append(str(subj))
             trials.append(str(tid))
+            wins.append(f"{subj}_{tid}_window{i}")
 
     return WindowedDataset(
         X=np.stack(xs, axis=0)
@@ -85,5 +99,6 @@ def window_dataset(dataset: Dataset, config: WindowingConfig) -> WindowedDataset
             window_end=np.asarray(ends, dtype=int),
             subject_ids=np.asarray(subjects),
             trial_ids=np.asarray(trials),
+            window_ids=np.asarray(wins),
         ),
     )

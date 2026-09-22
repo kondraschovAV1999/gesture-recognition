@@ -2,7 +2,10 @@ import numpy as np
 
 from hand_gesture_recognition.configuration.schema import WindowingConfig
 from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
-from hand_gesture_recognition.data.windowing.base import window_dataset
+from hand_gesture_recognition.data.windowing.base import (
+    WindowedPartitions,
+    window_dataset,
+)
 
 
 def _ds(lengths=(100, 60), labels=(0, 1), subjects=("s1", "s2")):
@@ -78,3 +81,24 @@ def test_per_window_labels_from_gesture_bounds():
     wd = window_dataset(ds, WindowingConfig(window_size_samples=10, stride_samples=10))
     # trial 0 (gesture [10,30]) -> [0,1,1,0,0]; trial 1 (rest) -> [0,0,0,0,0]
     assert wd.y.tolist() == [0, 1, 1, 0, 0, 0, 0, 0, 0, 0]
+
+
+def test_window_ids_are_unique_and_traceable():
+    ds = _ds(lengths=(100, 100), labels=(0, 1), subjects=("s1", "s2"))
+    cfg = WindowingConfig(window_size_samples=40, stride_samples=10)
+    wd = window_dataset(ds, cfg)
+    ids = wd.metadata.window_ids.tolist()
+    assert len(ids) == 14
+    assert len(set(ids)) == 14  # unique
+    # traceable: first trial's windows embed the trial id "t1" and subject "s1"
+    assert ids[0].startswith("s1_t1_")
+    assert ids[7].startswith("s2_t2_")
+
+
+def test_windowed_partitions_dataclass():
+    ds = _ds(lengths=(100, 100), labels=(0, 1), subjects=("s1", "s2"))
+    cfg = WindowingConfig(window_size_samples=40, stride_samples=10)
+    wd = window_dataset(ds, cfg)
+    wp = WindowedPartitions(train=wd, val=wd, test=wd)
+    assert wp.train is wd
+    assert wp.val.X.shape[0] == 14
