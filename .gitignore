@@ -27,6 +27,7 @@ mlflow.db
 
 # Lightning checkpoints
 checkpoints/
+lightning_logs/
 
 # SDD scratch workspace (task briefs, reports, review packages, ledger)
 .superpowers/

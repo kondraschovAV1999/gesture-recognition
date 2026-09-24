@@ -20,6 +20,8 @@ from hand_gesture_recognition.neural.datamodules.emg import (
 )
 from hand_gesture_recognition.neural.models.dnn import DNNModule
 from hand_gesture_recognition.neural.models.lstm import LSTMModule
+from hand_gesture_recognition.neural.models.cnn import CNNModule
+from hand_gesture_recognition.neural.models.cnn_lstm import CNNLSTMModule
 
 
 def _windowed_partitions():
@@ -111,6 +113,25 @@ def test_dnn_forward_shape():
 
 def test_lstm_forward_shape():
     model = LSTMModule(n_channels=8, n_classes=3, hidden_size=16, num_layers=1)
+    logits = model(torch.randn(4, 40, 8))
+    assert logits.shape == (4, 3)
+
+
+def test_cnn_forward_shape():
+    model = CNNModule(n_channels=8, n_classes=3, conv_filters=(16, 32), kernel_size=3)
+    logits = model(torch.randn(4, 40, 8))
+    assert logits.shape == (4, 3)
+
+
+def test_cnn_lstm_forward_shape():
+    model = CNNLSTMModule(
+        n_channels=8,
+        n_classes=3,
+        conv_filters=(16, 32),
+        kernel_size=3,
+        hidden_size=16,
+        num_layers=1,
+    )
     logits = model(torch.randn(4, 40, 8))
     assert logits.shape == (4, 3)
 

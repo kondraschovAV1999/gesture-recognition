@@ -34,7 +34,8 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db
 | `dataset.loader.subjects=[train:user1,train:user2,...]` | load a subset of the real EPN612 data |
 | `split.strategy=subject_wise` / `random` / `predefined` | choose the split strategy |
 | `backend=classical` / `neural` | choose the pipeline |
-| `neural=dnn` / `neural=lstm` | choose the neural model |
+| `classical.feature_type=time_domain` / `frequency_domain` / `combined` / `custom` | choose the handcrafted feature representation (classical) |
+| `neural=dnn` / `lstm` / `cnn` / `cnn_lstm` | choose the neural model (incl. the composite CNN + LSTM) |
 | `neural.trainer.max_epochs=10` | set training epochs |
 | `windowing.window_size_seconds=0.2` `windowing.stride_seconds=0.05` | window size / stride |
 | `reporting.formats=[json,html]` | report formats |

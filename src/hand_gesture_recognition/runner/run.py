@@ -6,6 +6,7 @@ import uuid
 from dataclasses import replace
 from datetime import datetime
 
+import numpy as np
 from hydra.utils import instantiate
 
 from hand_gesture_recognition.configuration.loader import save_resolved_config
@@ -178,11 +179,21 @@ class ExperimentRunner:
             X_train = step.fit_transform(X_train)
             X_val = step.transform(X_val)
             X_test = step.transform(X_test)
-        for step_cfg in self.cfg.classical.features:
+        # Feature extractors are applied independently to the preprocessed
+        # windowed signal and concatenated column-wise (FeatureUnion), so
+        # multiple extractors (e.g. time + frequency) compose correctly.
+        feature_specs = self.cfg.classical.resolve_features(
+            self.cfg.dataset.sampling_rate
+        )
+        train_parts, val_parts, test_parts = [], [], []
+        for step_cfg in feature_specs:
             step = instantiate(step_cfg)
-            X_train = step.fit_transform(X_train)
-            X_val = step.transform(X_val)
-            X_test = step.transform(X_test)
+            train_parts.append(step.fit_transform(X_train))
+            val_parts.append(step.transform(X_val))
+            test_parts.append(step.transform(X_test))
+        X_train = np.concatenate(train_parts, axis=1)
+        X_val = np.concatenate(val_parts, axis=1)
+        X_test = np.concatenate(test_parts, axis=1)
 
         model = instantiate(self.cfg.classical.model)
         model.fit(X_train, windowed.train.y)
@@ -311,6 +322,7 @@ class ExperimentRunner:
         if not self.cfg.reporting.visualize:
             return
         from hand_gesture_recognition.reporting.visualization import (
+            plot_fft_spectrum,
             plot_predictions_on_signal,
             plot_raw_signal_by_class,
             plot_signal_data_flow,
@@ -354,6 +366,20 @@ class ExperimentRunner:
             path=p,
         )
         self.tracker.log_artifact(p)
+
+        # FFT power spectrum (only when frequency-domain features are active)
+        feature_specs = self.cfg.classical.resolve_features(
+            self.cfg.dataset.sampling_rate
+        )
+        if any("frequency_domain" in str(f.get("_target_", "")) for f in feature_specs):
+            p = os.path.join(run_dir, "fft_spectrum.png")
+            plot_fft_spectrum(
+                processed_dataset,
+                self.cfg.windowing,
+                sampling_rate=processed_dataset.metadata.sampling_rate,
+                path=p,
+            )
+            self.tracker.log_artifact(p)
 
     def _persist_artifacts(self, dataset, result) -> None:
         run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)

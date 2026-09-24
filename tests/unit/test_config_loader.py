@@ -56,3 +56,34 @@ def test_gesture_crop_config_default_enabled():
 def test_gesture_crop_config_can_be_disabled():
     cfg = load_config(mode="compose", overrides=["gesture_crop=none"])
     assert cfg.gesture_crop.enabled is False
+
+
+def test_classical_feature_type_resolves_frequency():
+    cfg = load_config(
+        mode="compose",
+        overrides=["classical.feature_type=frequency_domain", "backend=classical"],
+    )
+    specs = cfg.classical.resolve_features(cfg.dataset.sampling_rate)
+    targets = [f["_target_"] for f in specs]
+    assert any("FrequencyDomainFeatures" in t for t in targets)
+    # sampling rate is injected from the dataset config (not hardcoded)
+    assert specs[0]["sampling_rate"] == cfg.dataset.sampling_rate
+
+
+def test_classical_feature_type_resolves_combined():
+    cfg = load_config(
+        mode="compose",
+        overrides=["classical.feature_type=combined", "backend=classical"],
+    )
+    specs = cfg.classical.resolve_features(cfg.dataset.sampling_rate)
+    targets = [f["_target_"] for f in specs]
+    assert any("TimeDomainFeatures" in t for t in targets)
+    assert any("FrequencyDomainFeatures" in t for t in targets)
+
+
+def test_classical_feature_type_rejects_unknown():
+    with pytest.raises(ConfigValidationError):
+        load_config(
+            mode="compose",
+            overrides=["classical.feature_type=bogus", "backend=classical"],
+        )

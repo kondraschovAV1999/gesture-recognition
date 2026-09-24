@@ -24,6 +24,26 @@ def test_classical_smoke(tmp_path, monkeypatch):
     assert (out / "evaluation" / cfg.run_id / "report.json").exists()
 
 
+def test_classical_frequency_smoke(tmp_path, monkeypatch):
+    cfg = load_config(
+        mode="compose",
+        overrides=[
+            "dataset.name=synthetic",
+            "split.strategy=random",
+            "classical.feature_type=frequency_domain",
+            "reporting.formats=[json]",
+        ],
+    )
+    cfg.tracking.tracking_uri = str(tmp_path / "mlruns")
+    monkeypatch.setenv("HAND_GESTURE_RECOGNITION_OUTPUT", str(tmp_path / "output"))
+    runner = ExperimentRunner(cfg)
+    result = runner.run()
+    assert "accuracy" in result.metrics
+    out = tmp_path / "output"
+    # frequency-domain features trigger the FFT power-spectrum artifact
+    assert (out / "evaluation" / cfg.run_id / "fft_spectrum.png").exists()
+
+
 def test_neural_smoke_with_optimizer_and_early_stopping(tmp_path, monkeypatch):
     cfg = load_config(
         mode="compose",
@@ -72,3 +92,24 @@ def test_neural_smoke(tmp_path, monkeypatch):
     out = tmp_path / "output"
     assert (out / "evaluation" / cfg.run_id / "config" / "resolved.yaml").exists()
     assert (out / "evaluation" / cfg.run_id / "report.json").exists()
+
+
+def test_neural_cnn_lstm_smoke(tmp_path, monkeypatch):
+    cfg = load_config(
+        mode="compose",
+        overrides=[
+            "dataset.name=synthetic",
+            "split.strategy=random",
+            "backend=neural",
+            "neural=cnn_lstm",
+            "neural.trainer.max_epochs=1",
+            "reporting.formats=[json]",
+        ],
+    )
+    cfg.tracking.tracking_uri = str(tmp_path / "mlruns")
+    monkeypatch.setenv("HAND_GESTURE_RECOGNITION_OUTPUT", str(tmp_path / "output"))
+    runner = ExperimentRunner(cfg)
+    result = runner.run()
+    assert "accuracy" in result.metrics
+    out = tmp_path / "output"
+    assert (out / "evaluation" / cfg.run_id / "config" / "resolved.yaml").exists()

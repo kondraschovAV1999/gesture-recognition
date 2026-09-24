@@ -110,26 +110,51 @@ channels)` along `axis=-2`) and reference it in the `signal_processing` list.
 
 ```yaml
 # @package classical
-features:
-  - _target_: hand_gesture_recognition.features.time_domain.TimeDomainFeatures
+feature_type: time_domain   # time_domain | frequency_domain | combined | custom
 preprocessing:
-  - _target_: sklearn.preprocessing.StandardScaler
+  - _target_: hand_gesture_recognition.preprocessing.learned.PerChannelStandardScaler
 model:
   _target_: hand_gesture_recognition.classical.models.random_forest.RandomForestEstimator
   n_estimators: 100
   random_state: 42
 ```
 
-Swap the model by editing `model._target_` (e.g. to a `SVC` or `LogisticRegression`
-`_target_`), or add a new file under `configs/classical/` and select it with
-`classical=<name>`. The classical runner applies `features` → `preprocessing` →
-`model` in order, all via `instantiate`.
+The handcrafted feature representation is chosen with a single `feature_type`
+knob (select from the CLI with `classical.feature_type=<name>`):
+
+| `feature_type` | feature extractors applied |
+|---|---|
+| `time_domain` | `TimeDomainFeatures` |
+| `frequency_domain` | `FrequencyDomainFeatures` (sampling rate auto-injected from the dataset) |
+| `combined` | both, concatenated column-wise |
+| `custom` | an explicit `classical.features:` list of `_target_` entries (for any other extractor) |
+
+Swap the model by editing `model._target_` (e.g. to a `SVC` or
+`LogisticRegression` `_target_`), or add a new file under `configs/classical/`
+and select it with `classical=<name>`. The classical runner applies
+`preprocessing` → `features` → `model`, all via `instantiate`. When several
+extractors are listed they are applied independently and concatenated
+column-wise (FeatureUnion), so `combined` composes time + frequency into one
+feature vector.
 
 **To add a feature extractor**, subclass
 `sklearn.base.BaseEstimator, TransformerMixin` with `transform(X) -> (n_windows, features)`
-(see `features/time_domain.py`) and reference it in `features:`.
+(see `features/time_domain.py`) and reference it via `feature_type: custom` +
+the `features:` list.
+
+Built-in extractors:
+
+- `features/time_domain.py` — `TimeDomainFeatures` (RMS, std, min/max, ...).
+- `features/frequency_domain.py` — `FrequencyDomainFeatures` (total power, peak/
+  mean/median frequency per channel). Requires a `sampling_rate` kwarg (injected
+  automatically from `dataset.sampling_rate` by `ClassicalConfig.resolve_features`);
+  it also accepts `use_hann` / `remove_dc` flags.
 
 ## Switching a neural model
+
+Neural models are end-to-end over the preprocessed signal; the handcrafted
+time/frequency features are a *separate* representation used by the classical
+pipeline (or explicitly fused with neural representations later).
 
 `configs/neural/lstm.yaml` (mirrors `dnn.yaml`):
 
@@ -150,6 +175,14 @@ trainer:
   accelerator: auto   # GPU when available, else CPU
   enable_checkpointing: false
 ```
+
+Built-in neural architectures (select with `neural=<name>`):
+
+- `dnn` — `DNNModule`: MLP over the flattened window.
+- `lstm` — `LSTMModule`: LSTM over the time axis.
+- `cnn` — `CNNModule`: 1-D CNN over the time axis + global pooling.
+- `cnn_lstm` — `CNNLSTMModule`: composite CNN (local temporal features) → LSTM
+  (sequence model) → dense head.
 
 Switch with `neural=dnn` / `neural=lstm` from the CLI.
 

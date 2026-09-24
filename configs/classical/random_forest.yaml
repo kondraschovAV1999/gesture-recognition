@@ -1,8 +1,7 @@
 # @package classical
+feature_type: time_domain   # time_domain | frequency_domain | combined | custom
 preprocessing:
   - _target_: hand_gesture_recognition.preprocessing.learned.PerChannelStandardScaler
-features:
-  - _target_: hand_gesture_recognition.features.time_domain.TimeDomainFeatures
 model:
   _target_: hand_gesture_recognition.classical.models.random_forest.RandomForestEstimator
   n_estimators: 100

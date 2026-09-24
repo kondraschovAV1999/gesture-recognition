@@ -9,6 +9,7 @@ from hand_gesture_recognition.classical.pipelines.windowing import WindowingTran
 from hand_gesture_recognition.configuration.schema import WindowingConfig
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
+from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
 
 
 def test_windowing_transformer_calls_shared_windowing():
@@ -60,3 +61,12 @@ def test_time_domain_features_8_channels():
     assert out.shape == (5, 56)  # 7 features x 8 channels
     # all-zero input must not produce NaN (division guards)
     assert np.isfinite(out).all()
+
+
+def test_time_and_frequency_features_concatenate():
+    X = np.random.default_rng(0).normal(0, 1, size=(5, 40, 8)).astype(np.float32)
+    time_feat = TimeDomainFeatures().fit_transform(X)
+    freq_feat = FrequencyDomainFeatures(sampling_rate=200.0).fit_transform(X)
+    combined = np.concatenate([time_feat, freq_feat], axis=1)
+    assert combined.shape == (5, 7 * 8 + 4 * 8)  # union of both extractors
+    assert np.isfinite(combined).all()
