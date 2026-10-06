@@ -16,12 +16,10 @@ def remove_no_gesture(dataset: Dataset) -> Dataset:
     to the kept classes, and ``metadata.drop_rest_windows`` is set so windowing
     later *skips* (rather than labels) the rest windows outside each gesture's
     bounds. If there are no rest trials (e.g. the synthetic dataset), the
-    dataset is returned unchanged.
+    remap is the identity but `drop_rest_windows` is still set so any
+    out-of-gesture windows are dropped.
     """
     keep = dataset.gesture_start >= 0
-    if keep.all():
-        return dataset
-
     kept_labels = np.unique(dataset.labels[keep])
     old_to_new = {int(old): new for new, old in enumerate(kept_labels)}
     new_labels = np.asarray(

@@ -46,13 +46,15 @@ def test_updates_class_names_and_signals_windowing():
     assert ds.metadata.drop_rest_windows is True
 
 
-def test_no_op_when_no_rest_trials():
+def test_remaps_and_flags_when_no_rest_trials():
     ds = _dataset()
     ds.labels = np.array([1, 2, 4, 4])
     ds.gesture_start = np.array([10, 20, 30, 30])
     ds.gesture_end = np.array([50, 60, 70, 70])
     out = remove_no_gesture(ds)
-    assert out is ds
+    assert out.labels.tolist() == [0, 1, 2, 2]  # fist->0, waveIn->1, open->2
+    assert out.metadata.class_names == ["fist", "waveIn", "open"]
+    assert out.metadata.drop_rest_windows is True
 
 
 def test_filters_subject_info_to_remaining_subjects():
