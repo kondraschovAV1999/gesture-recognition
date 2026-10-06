@@ -36,6 +36,7 @@ class WindowedPartitions:
 
 def window_dataset(dataset: Dataset, config: WindowingConfig) -> WindowedDataset:
     ws, stride = config.resolve(sampling_rate=dataset.metadata.sampling_rate)
+    drop_rest = dataset.metadata.drop_rest_windows
     n_channels = (
         len(dataset.metadata.channels)
         if dataset.metadata.channels
@@ -69,16 +70,12 @@ def window_dataset(dataset: Dataset, config: WindowingConfig) -> WindowedDataset
         for i in range(n_windows):
             s = i * stride
             e = s + ws
-            # Per-window label from the gesture ground-truth bounds: 0 (rest)
-            # outside [start, end], the trial's gesture label (1..5) inside.
-            if g_start < 0:  # rest trial
-                w_label = 0
-            elif e <= g_start:  # window fully before gesture
-                w_label = 0
-            elif s >= g_end:  # window fully after gesture
-                w_label = 0
-            else:  # window overlaps the gesture segment
-                w_label = int(label)
+            # A window is "rest" if it does not overlap the gesture segment
+            # [g_start, g_end] (or the trial itself is a rest trial, g_start < 0).
+            is_rest = (g_start < 0) or (e <= g_start) or (s >= g_end)
+            if drop_rest and is_rest:
+                continue  # no-gesture class removed: skip rest windows entirely
+            w_label = 0 if is_rest else int(label)
             xs.append(trial[s:e])
             ys.append(w_label)
             starts.append(s)

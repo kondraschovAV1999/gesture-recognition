@@ -102,3 +102,32 @@ def test_windowed_partitions_dataclass():
     wp = WindowedPartitions(train=wd, val=wd, test=wd)
     assert wp.train is wd
     assert wp.val.X.shape[0] == 14
+
+
+def test_drop_rest_windows_skips_rest():
+    ds = Dataset(
+        trials=[
+            np.zeros((50, 2), dtype=np.float32),
+            np.zeros((50, 2), dtype=np.float32),
+        ],
+        labels=np.array([1, 0]),
+        subject_ids=np.array(["s1", "s1"]),
+        trial_ids=np.array(["t1", "t2"]),
+        gesture_start=np.array([10, -1]),
+        gesture_end=np.array([30, -1]),
+        metadata=DatasetMetadata(
+            name="x",
+            version="0",
+            sampling_rate=200.0,
+            channels=["c1", "c2"],
+            class_names=["fist", "waveIn"],
+            content_hash="h",
+            drop_rest_windows=True,
+        ),
+    )
+    wd = window_dataset(ds, WindowingConfig(window_size_samples=10, stride_samples=10))
+    # trial 0 (gesture [10,30]): only the two overlapping windows survive
+    # trial 1 (rest): fully dropped
+    assert wd.y.tolist() == [1, 1]
+    assert wd.X.shape == (2, 10, 2)
+    assert wd.metadata.window_ids.tolist() == ["s1_t1_window1", "s1_t1_window2"]
