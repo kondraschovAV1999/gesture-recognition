@@ -60,6 +60,12 @@ class ExperimentRunner:
         try:
             with stage(self.logger, "load_dataset"):
                 raw_dataset = self._load_dataset()
+            if not self.cfg.dataset.include_no_gesture:
+                from hand_gesture_recognition.data.class_selection import (
+                    remove_no_gesture,
+                )
+
+                raw_dataset = remove_no_gesture(raw_dataset)
             with stage(self.logger, "analytics"):
                 self._analytics(raw_dataset)
             with stage(self.logger, "gesture_crop"):
@@ -164,11 +170,15 @@ class ExperimentRunner:
             window_dataset,
         )
 
-        return WindowedPartitions(
+        windowed = WindowedPartitions(
             train=window_dataset(split.train, self.cfg.windowing),
             val=window_dataset(split.val, self.cfg.windowing),
             test=window_dataset(split.test, self.cfg.windowing),
         )
+        for part in ("train", "val", "test"):
+            if getattr(windowed, part).X.shape[0] == 0:
+                self.logger.warning(f"partition '{part}' has 0 windows after windowing")
+        return windowed
 
     def _train_and_predict_classical(
         self, windowed: WindowedPartitions

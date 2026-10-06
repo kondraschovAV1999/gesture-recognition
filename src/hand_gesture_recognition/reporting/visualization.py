@@ -109,9 +109,10 @@ def plot_predictions_on_signal(
 
     tid = example_tid
     if tid is None:
-        # pick the first non-noGesture trial as a meaningful example
+        # pick the first gesture trial as a meaningful example (rest trials
+        # have gesture_start < 0)
         for i in range(dataset.n_trials):
-            if int(dataset.labels[i]) != 0:
+            if int(dataset.gesture_start[i]) >= 0:
                 tid = str(dataset.trial_ids[i])
                 break
         tid = tid or str(dataset.trial_ids[0])
@@ -307,7 +308,7 @@ def plot_signal_processing_comparison(
     tid = example_tid
     if tid is None:
         for i in range(raw_dataset.n_trials):
-            if int(raw_dataset.labels[i]) != 0:
+            if int(raw_dataset.gesture_start[i]) >= 0:
                 tid = str(raw_dataset.trial_ids[i])
                 break
         tid = tid or str(raw_dataset.trial_ids[0])

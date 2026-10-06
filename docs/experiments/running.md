@@ -39,6 +39,7 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db
 | `neural.trainer.max_epochs=10` | set training epochs |
 | `windowing.window_size_seconds=0.2` `windowing.stride_seconds=0.05` | window size / stride |
 | `reporting.formats=[json,html]` | report formats |
+| `dataset.include_no_gesture=false` | drop the `noGesture`/rest class: 5-class (gesture-only) pipeline |
 
 ### Examples
 
@@ -58,6 +59,10 @@ python -m hand_gesture_recognition --mode compose \
 python -m hand_gesture_recognition --mode compose \
   dataset.loader.subjects=[train:user1,train:user2,train:user3,train:user4] \
   split.strategy=predefined backend=neural neural=dnn
+
+# 5-class (no noGesture/rest class): classify only gesture-active windows
+python -m hand_gesture_recognition --mode compose \
+  dataset.include_no_gesture=false gesture_crop=none
 ```
 
 ## Python API (running from a script/notebook)
