@@ -16,6 +16,7 @@ class DatasetMetadata:
     class_names: List[str]
     content_hash: str
     provenance: Dict[str, Any] = field(default_factory=dict)
+    drop_rest_windows: bool = False  # windowing drops (not labels) rest windows
 
 
 @dataclass
