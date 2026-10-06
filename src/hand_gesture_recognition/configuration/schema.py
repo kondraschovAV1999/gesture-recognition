@@ -76,6 +76,7 @@ class DatasetConfig:
     name: str = "epn612"
     path: str = "resources/data/EPN612"
     sampling_rate: float = 200.0
+    include_no_gesture: bool = True
     loader: Dict[str, Any] = field(
         default_factory=lambda: {
             "_target_": "hand_gesture_recognition.data.loaders.epn612.EPN612Loader"
@@ -270,6 +271,11 @@ def validate_experiment_config(cfg: ExperimentConfig) -> ExperimentConfig:
     cfg.classical.validate()
     # Validate windowing consistency against the configured sampling rate.
     cfg.windowing.resolve(sampling_rate=cfg.dataset.sampling_rate)
+    if not cfg.dataset.include_no_gesture and 0 in cfg.evaluation.exclude_classes:
+        raise ConfigValidationError(
+            "evaluation.exclude_classes=[0] is ambiguous in 5-class mode "
+            "(label 0 is now 'fist'); remove it or set dataset.include_no_gesture=true"
+        )
     if cfg.schema_version != SCHEMA_VERSION:
         raise ConfigValidationError(
             f"schema_version={cfg.schema_version!r} != {SCHEMA_VERSION!r}"
