@@ -4,6 +4,7 @@ defaults:
   - windowing: default
   - signal_processing: emg
   - gesture_crop: default
+  - baseline: none
   - classical: random_forest
   - neural: lstm
   - evaluation: basic

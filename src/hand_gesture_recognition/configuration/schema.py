@@ -72,6 +72,11 @@ class GestureCropConfig:
 
 
 @dataclass
+class BaselineConfig:
+    enabled: bool = False
+
+
+@dataclass
 class DatasetConfig:
     name: str = "epn612"
     path: str = "resources/data/EPN612"
@@ -252,6 +257,7 @@ class ExperimentConfig:
     windowing: WindowingConfig = field(default_factory=WindowingConfig)
     signal_processing: List[Dict[str, Any]] = field(default_factory=list)
     gesture_crop: GestureCropConfig = field(default_factory=GestureCropConfig)
+    baseline: BaselineConfig = field(default_factory=BaselineConfig)
     classical: ClassicalConfig = field(default_factory=ClassicalConfig)
     neural: NeuralConfig = field(default_factory=NeuralConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)

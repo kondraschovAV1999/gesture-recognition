@@ -12,6 +12,7 @@ from hand_gesture_recognition.configuration.errors import (
 )
 from hand_gesture_recognition.configuration.schema import (
     AnalyticsConfig,
+    BaselineConfig,
     ClassicalConfig,
     DatasetConfig,
     EvaluationConfig,
@@ -49,6 +50,7 @@ def _coerce(d: Dict[str, Any]) -> ExperimentConfig:
         windowing=WindowingConfig(**d.get("windowing", {})),
         signal_processing=list(d.get("signal_processing", [])),
         gesture_crop=GestureCropConfig(**(d.get("gesture_crop") or {})),
+        baseline=BaselineConfig(**(d.get("baseline") or {})),
         classical=ClassicalConfig(**d.get("classical", {})),
         neural=NeuralConfig(**d.get("neural", {})),
         evaluation=EvaluationConfig(**d.get("evaluation", {})),
