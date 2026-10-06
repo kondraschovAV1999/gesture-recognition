@@ -14,6 +14,7 @@ from hand_gesture_recognition.configuration.schema import ExperimentConfig
 from hand_gesture_recognition.classical.adapters.sklearn import SklearnPredictionAdapter
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.data.splits.base import (
+    DataSplit,
     assert_no_group_leakage,
     split_dataset,
 )
@@ -60,25 +61,49 @@ class ExperimentRunner:
         try:
             with stage(self.logger, "load_dataset"):
                 raw_dataset = self._load_dataset()
-            if not self.cfg.dataset.include_no_gesture:
-                from hand_gesture_recognition.data.class_selection import (
-                    remove_no_gesture,
-                )
-
-                raw_dataset = remove_no_gesture(raw_dataset)
             with stage(self.logger, "analytics"):
                 self._analytics(raw_dataset)
             with stage(self.logger, "gesture_crop"):
                 cropped = self._gesture_crop(raw_dataset)
-            with stage(self.logger, "signal_processing"):
-                dataset = self._signal_processing(cropped)
             with stage(self.logger, "split"):
-                split = split_dataset(dataset, cfg.split)
-                # Group leakage is only meaningful for group-based splits;
-                # random/stratified splits intentionally mix subjects across
-                # partitions (the smoke test uses strategy=random).
+                split = split_dataset(cropped, cfg.split)
                 if cfg.split.strategy in ("subject_wise", "session_wise", "predefined"):
                     assert_no_group_leakage(split)
+            # class set is tracked explicitly: class selection may reduce it.
+            class_names = cropped.metadata.class_names
+            baseline_remover = None
+            if cfg.baseline.enabled:
+                with stage(self.logger, "baseline"):
+                    from hand_gesture_recognition.preprocessing.baseline import (
+                        BaselineRemoval,
+                    )
+
+                    baseline_remover = BaselineRemoval().fit(split.train)
+                    split = DataSplit(
+                        train=baseline_remover.transform(split.train),
+                        val=baseline_remover.transform(split.val),
+                        test=baseline_remover.transform(split.test),
+                    )
+            if not cfg.dataset.include_no_gesture:
+                with stage(self.logger, "class_selection"):
+                    from hand_gesture_recognition.data.class_selection import (
+                        build_no_gesture_remap,
+                        drop_no_gesture,
+                    )
+
+                    remap, class_names = build_no_gesture_remap(cropped)
+                    split = DataSplit(
+                        train=drop_no_gesture(split.train, remap, class_names),
+                        val=drop_no_gesture(split.val, remap, class_names),
+                        test=drop_no_gesture(split.test, remap, class_names),
+                    )
+            with stage(self.logger, "signal_processing"):
+                split = self._signal_processing(split)
+            # reconstruct a processed dataset (frozen baseline + signal processing)
+            # for visualization/tracking display only.
+            processed_dataset = self._apply_signal_processing(cropped)
+            if baseline_remover is not None:
+                processed_dataset = baseline_remover.transform(processed_dataset)
             with stage(self.logger, "windowing"):
                 windowed = self._window(split)
             with stage(self.logger, "train"):
@@ -86,7 +111,7 @@ class ExperimentRunner:
                     predictions = self._train_and_predict_classical(windowed)
                 else:
                     predictions = self._train_and_predict_neural(
-                        windowed, n_classes=len(dataset.metadata.class_names)
+                        windowed, n_classes=len(class_names)
                     )
             with stage(self.logger, "evaluate"):
                 results = {}
@@ -94,24 +119,24 @@ class ExperimentRunner:
                     results[part] = evaluate(
                         getattr(predictions, part),
                         cfg.evaluation,
-                        dataset_id=dataset.metadata.name,
+                        dataset_id=cropped.metadata.name,
                         split_info={"strategy": cfg.split.strategy},
-                        class_names=dataset.metadata.class_names,
+                        class_names=class_names,
                     )
                 result = results["test"]
                 self.logger.info(f"Evaluation metrics: {result.metrics}")
             with stage(self.logger, "track_and_report"):
-                self.tracker.log_dataset(dataset)
+                self.tracker.log_dataset(cropped)
                 self.tracker.log_params({"seed": cfg.seed, "backend": cfg.backend})
                 for part, r in results.items():
                     self.tracker.log_results(
                         r, partition=(None if part == "test" else part)
                     )
-                    self.tracker.log_confusion_matrix(
-                        r, dataset.metadata.class_names, partition=part
-                    )
-                self._visualize(cropped, dataset, split, predictions)
-                self._persist_artifacts(dataset, result)
+                    self.tracker.log_confusion_matrix(r, class_names, partition=part)
+                self._visualize(
+                    cropped, processed_dataset, split, predictions, class_names
+                )
+                self._persist_artifacts(cropped, result)
             self.tracker.finish("FINISHED")
             return result
         except Exception:
@@ -127,17 +152,29 @@ class ExperimentRunner:
         # process runs from the repo root).
         return loader.load(resolve_path(self.cfg.dataset.path))
 
-    def _signal_processing(self, dataset):
-        # Deterministic signal processing (rectify, filters, envelope) applied
-        # to the raw continuous signal BEFORE splitting — safe since it learns
-        # nothing from the data.
+    def _apply_signal_steps(self, trials):
         if not self.cfg.signal_processing:
-            return dataset
+            return trials
         steps = [instantiate(step_cfg) for step_cfg in self.cfg.signal_processing]
-        trials = dataset.trials
         for step in steps:
             trials = [step.transform(t) for t in trials]
-        return replace(dataset, trials=trials)
+        return trials
+
+    def _apply_signal_processing(self, dataset):
+        return replace(dataset, trials=self._apply_signal_steps(dataset.trials))
+
+    def _signal_processing(self, split):
+        # Deterministic per-trial steps; applied per-partition after baseline /
+        # class selection. Equivalent to the old pre-split application.
+        return DataSplit(
+            train=replace(
+                split.train, trials=self._apply_signal_steps(split.train.trials)
+            ),
+            val=replace(split.val, trials=self._apply_signal_steps(split.val.trials)),
+            test=replace(
+                split.test, trials=self._apply_signal_steps(split.test.trials)
+            ),
+        )
 
     def _gesture_crop(self, dataset):
         if not self.cfg.gesture_crop.enabled:
@@ -328,7 +365,9 @@ class ExperimentRunner:
             ),
         )
 
-    def _visualize(self, raw_dataset, processed_dataset, split, predictions) -> None:
+    def _visualize(
+        self, raw_dataset, processed_dataset, split, predictions, class_names
+    ) -> None:
         if not self.cfg.reporting.visualize:
             return
         from hand_gesture_recognition.reporting.visualization import (
@@ -341,10 +380,10 @@ class ExperimentRunner:
 
         run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)
         os.makedirs(run_dir, exist_ok=True)
-        class_names = processed_dataset.metadata.class_names
 
-        # raw signal per class (6 for EPN612; N for synthetic)
-        for p in plot_raw_signal_by_class(raw_dataset, run_dir, class_names):
+        # raw signal per class (use the raw dataset's own class names so
+        # 'noGesture' is not mislabeled in 5-class mode)
+        for p in plot_raw_signal_by_class(raw_dataset, run_dir, None):
             self.tracker.log_artifact(p)
 
         # predictions on signal: validation + test
