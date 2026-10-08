@@ -65,76 +65,97 @@ class ExperimentRunner:
                 self._analytics(raw_dataset)
             with stage(self.logger, "gesture_crop"):
                 cropped = self._gesture_crop(raw_dataset)
-            with stage(self.logger, "split"):
-                split = split_dataset(cropped, cfg.split)
-                if cfg.split.strategy in ("subject_wise", "session_wise", "predefined"):
-                    assert_no_group_leakage(split)
-            # class set is tracked explicitly: class selection may reduce it.
+
+            # Global class set: no-gesture remap computed once from the FULL
+            # dataset so every fold/partition shares the same mapping.
             class_names = cropped.metadata.class_names
-            baseline_remover = None
-            if cfg.baseline.enabled:
-                with stage(self.logger, "baseline"):
-                    from hand_gesture_recognition.preprocessing.baseline import (
-                        BaselineRemoval,
-                    )
-
-                    baseline_remover = BaselineRemoval().fit(split.train)
-                    split = DataSplit(
-                        train=baseline_remover.transform(split.train),
-                        val=baseline_remover.transform(split.val),
-                        test=baseline_remover.transform(split.test),
-                    )
+            remap = None
             if not cfg.dataset.include_no_gesture:
-                with stage(self.logger, "class_selection"):
-                    from hand_gesture_recognition.data.class_selection import (
-                        build_no_gesture_remap,
-                        drop_no_gesture,
-                    )
+                from hand_gesture_recognition.data.class_selection import (
+                    build_no_gesture_remap,
+                )
 
-                    remap, class_names = build_no_gesture_remap(cropped)
-                    split = DataSplit(
-                        train=drop_no_gesture(split.train, remap, class_names),
-                        val=drop_no_gesture(split.val, remap, class_names),
-                        test=drop_no_gesture(split.test, remap, class_names),
-                    )
-            with stage(self.logger, "signal_processing"):
-                split = self._signal_processing(split)
-            # reconstruct a processed dataset (frozen baseline + signal processing)
-            # for visualization/tracking display only.
-            processed_dataset = self._apply_signal_processing(cropped)
-            if baseline_remover is not None:
-                processed_dataset = baseline_remover.transform(processed_dataset)
-            with stage(self.logger, "windowing"):
-                windowed = self._window(split)
-            with stage(self.logger, "train"):
-                if cfg.backend == "classical":
-                    predictions = self._train_and_predict_classical(windowed)
-                else:
-                    predictions = self._train_and_predict_neural(
-                        windowed, n_classes=len(class_names)
-                    )
-            with stage(self.logger, "evaluate"):
-                results = {}
-                for part in ("train", "val", "test"):
-                    results[part] = evaluate(
-                        getattr(predictions, part),
-                        cfg.evaluation,
-                        dataset_id=cropped.metadata.name,
-                        split_info={"strategy": cfg.split.strategy},
-                        class_names=class_names,
-                    )
+                remap, class_names = build_no_gesture_remap(cropped)
+            dataset_name = cropped.metadata.name
+
+            # Visualization-only baseline (fit on the FULL cropped dataset, a
+            # diagnostic; training baselines are fit per partition in
+            # _run_partition). Fitted only when visualization needs it.
+            viz_baseline = None
+            if cfg.baseline.enabled and cfg.visualization.enabled:
+                from hand_gesture_recognition.preprocessing.baseline import (
+                    BaselineRemoval,
+                )
+
+                viz_baseline = BaselineRemoval().fit(cropped)
+
+            if cfg.cv.enabled:
+                from hand_gesture_recognition.data.splits.folds import generate_folds
+
+                with stage(self.logger, "split"):
+                    folds = generate_folds(cropped, cfg.cv, cfg.split)
+                fold_test_results = []
+                for i, fold in enumerate(folds):
+                    with stage(self.logger, f"fold_{i}"):
+                        _, results = self._run_partition(
+                            fold, class_names, remap, dataset_name
+                        )
+                    if results["test"] is not None:
+                        fold_test_results.append(results["test"])
+                from hand_gesture_recognition.evaluation.aggregate import (
+                    aggregate_folds,
+                )
+
+                result = aggregate_folds(fold_test_results, cfg.run_id, dataset_name)
+                self.logger.info(f"CV metrics (mean): {result.metrics}")
+                split, predictions = None, None
+            else:
+                with stage(self.logger, "split"):
+                    split = split_dataset(cropped, cfg.split)
+                    if cfg.split.strategy in (
+                        "subject_wise",
+                        "session_wise",
+                        "predefined",
+                    ):
+                        assert_no_group_leakage(split)
+                predictions, results = self._run_partition(
+                    split, class_names, remap, dataset_name
+                )
                 result = results["test"]
-                self.logger.info(f"Evaluation metrics: {result.metrics}")
+
+            # processed dataset for visualization (baseline first, then signal).
+            processed_dataset = (
+                viz_baseline.transform(cropped) if viz_baseline is not None else cropped
+            )
+            processed_dataset = self._apply_signal_processing(processed_dataset)
+
             with stage(self.logger, "track_and_report"):
                 self.tracker.log_dataset(cropped)
                 self.tracker.log_params({"seed": cfg.seed, "backend": cfg.backend})
-                for part, r in results.items():
-                    self.tracker.log_results(
-                        r, partition=(None if part == "test" else part)
+                if cfg.cv.enabled:
+                    self._report_cv(result, fold_test_results, class_names)
+                    run_dir = os.path.join(
+                        self.output_root, "evaluation", self.cfg.run_id
                     )
-                    self.tracker.log_confusion_matrix(r, class_names, partition=part)
+                    self._write_cv_summary(fold_test_results, run_dir)
+                else:
+                    for part, r in results.items():
+                        if r is None:
+                            continue
+                        self.tracker.log_results(
+                            r, partition=(None if part == "test" else part)
+                        )
+                        self.tracker.log_confusion_matrix(
+                            r, class_names, partition=part
+                        )
                 self._visualize(
-                    cropped, processed_dataset, split, predictions, class_names
+                    cropped,
+                    processed_dataset,
+                    split,
+                    predictions,
+                    class_names,
+                    viz_baseline,
+                    is_cv=cfg.cv.enabled,
                 )
                 self._persist_artifacts(cropped, result)
             self.tracker.finish("FINISHED")
@@ -142,6 +163,76 @@ class ExperimentRunner:
         except Exception:
             self.tracker.finish("FAILED")
             raise
+
+    def _run_partition(self, split, class_names, remap, dataset_name):
+        """Run baseline -> class selection -> signal -> window -> train -> evaluate
+        on a single DataSplit. Returns (predictions, {part: result-or-None})."""
+        baseline_remover = None
+        if self.cfg.baseline.enabled:
+            from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
+
+            baseline_remover = BaselineRemoval().fit(split.train)
+            split = DataSplit(
+                train=baseline_remover.transform(split.train),
+                val=baseline_remover.transform(split.val),
+                test=baseline_remover.transform(split.test),
+            )
+        if not self.cfg.dataset.include_no_gesture:
+            from hand_gesture_recognition.data.class_selection import drop_no_gesture
+
+            split = DataSplit(
+                train=drop_no_gesture(split.train, remap, class_names),
+                val=drop_no_gesture(split.val, remap, class_names),
+                test=drop_no_gesture(split.test, remap, class_names),
+            )
+        split = self._signal_processing(split)
+        with stage(self.logger, "windowing"):
+            windowed = self._window(split)
+        with stage(self.logger, "train"):
+            if self.cfg.backend == "classical":
+                predictions = self._train_and_predict_classical(windowed)
+            else:
+                predictions = self._train_and_predict_neural(
+                    windowed, n_classes=len(class_names)
+                )
+        results = {}
+        for part in ("train", "val", "test"):
+            pred = getattr(predictions, part)
+            if pred is None or np.asarray(pred.y_true).size == 0:
+                results[part] = None
+                continue
+            results[part] = evaluate(
+                pred,
+                self.cfg.evaluation,
+                dataset_id=dataset_name,
+                split_info={"strategy": self.cfg.split.strategy},
+                class_names=class_names,
+            )
+        return predictions, results
+
+    def _report_cv(self, result, fold_results, class_names):
+        self.tracker.log_metrics(result.metrics)
+        if self.cfg.cv.report_per_fold:
+            for i, r in enumerate(fold_results):
+                self.tracker.log_results(r, partition=f"fold{i}")
+                self.tracker.log_confusion_matrix(
+                    r, class_names, partition=f"fold{i}_test"
+                )
+
+    def _write_cv_summary(self, fold_results, run_dir):
+        import json
+
+        os.makedirs(run_dir, exist_ok=True)
+        summary = {
+            "n_folds": len(fold_results),
+            "folds": [
+                {"fold": i, "metrics": r.metrics} for i, r in enumerate(fold_results)
+            ],
+        }
+        path = os.path.join(run_dir, "cv_summary.json")
+        with open(path, "w") as f:
+            json.dump(summary, f, indent=2)
+        self.tracker.log_artifact(path)
 
     def _load_dataset(self):
         if self.cfg.dataset.name == "synthetic":
@@ -366,10 +457,19 @@ class ExperimentRunner:
         )
 
     def _visualize(
-        self, raw_dataset, processed_dataset, split, predictions, class_names
+        self,
+        raw_dataset,
+        processed_dataset,
+        split,
+        predictions,
+        class_names,
+        viz_baseline=None,
+        is_cv=False,
     ) -> None:
-        if not self.cfg.reporting.visualize:
+        if not self.cfg.visualization.enabled:
             return
+        # TEMPORARY: existing body, minus the reporting.visualize guard, will be
+        # fully replaced in Task 12. Keep the current plot calls as-is for now.
         from hand_gesture_recognition.reporting.visualization import (
             plot_fft_spectrum,
             plot_predictions_on_signal,
@@ -380,43 +480,34 @@ class ExperimentRunner:
 
         run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)
         os.makedirs(run_dir, exist_ok=True)
-
-        # raw signal per class (use the raw dataset's own class names so
-        # 'noGesture' is not mislabeled in 5-class mode)
         for p in plot_raw_signal_by_class(raw_dataset, run_dir, None):
             self.tracker.log_artifact(p)
-
-        # predictions on signal: validation + test
-        for part, ds, pred in (
-            ("val", split.val, predictions.val),
-            ("test", split.test, predictions.test),
-        ):
-            p = os.path.join(run_dir, f"predictions_on_signal_{part}.png")
-            plot_predictions_on_signal(
-                ds, pred, self.cfg.windowing, class_names, path=p
-            )
-            self.tracker.log_artifact(p)
-
-        # before/after signal processing (only when processing was applied)
+        if not is_cv:
+            for part, ds, pred in (
+                ("val", split.val, predictions.val),
+                ("test", split.test, predictions.test),
+            ):
+                p = os.path.join(run_dir, f"predictions_on_signal_{part}.png")
+                plot_predictions_on_signal(
+                    ds, pred, self.cfg.windowing, class_names, path=p
+                )
+                self.tracker.log_artifact(p)
         if self.cfg.signal_processing:
             p = os.path.join(run_dir, "signal_processing_comparison.png")
             plot_signal_processing_comparison(raw_dataset, processed_dataset, path=p)
             self.tracker.log_artifact(p)
-
-        # existing 4-panel data flow (test partition)
-        p = os.path.join(run_dir, "signal_data_flow.png")
-        plot_signal_data_flow(
-            raw_dataset,
-            processed_dataset,
-            split.test,
-            predictions.test,
-            self.cfg.windowing,
-            class_names,
-            path=p,
-        )
-        self.tracker.log_artifact(p)
-
-        # FFT power spectrum (only when frequency-domain features are active)
+        if not is_cv:
+            p = os.path.join(run_dir, "signal_data_flow.png")
+            plot_signal_data_flow(
+                raw_dataset,
+                processed_dataset,
+                split.test,
+                predictions.test,
+                self.cfg.windowing,
+                class_names,
+                path=p,
+            )
+            self.tracker.log_artifact(p)
         feature_specs = self.cfg.classical.resolve_features(
             self.cfg.dataset.sampling_rate
         )
