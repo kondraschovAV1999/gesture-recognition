@@ -10,6 +10,8 @@ defaults:
   - evaluation: basic
   - analytics: basic
   - experiment: default
+  - cv: none
+  - visualization: default
   - _self_
 
 hydra:

@@ -1,0 +1,9 @@
+# @package cv
+enabled: true
+method: kfold
+n_splits: 5
+group_folds: true
+include_val: true
+val_ratio: 0.2
+seed: 42
+report_per_fold: true

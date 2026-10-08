@@ -1,0 +1,12 @@
+# @package visualization
+enabled: true
+consistent_scale: true
+selection:
+  gestures: []
+  channels: []
+  by_gesture: {}
+stage_progression: true
+feature_over_windows:
+  enabled: true
+  features: []
+  max_windows: 0

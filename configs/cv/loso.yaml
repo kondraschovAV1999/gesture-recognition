@@ -1,0 +1,7 @@
+# @package cv
+enabled: true
+method: loso
+include_val: true
+val_ratio: 0.2
+seed: 42
+report_per_fold: true
