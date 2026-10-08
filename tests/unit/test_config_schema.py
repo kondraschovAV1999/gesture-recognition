@@ -67,3 +67,39 @@ def test_validation_uses_configured_sampling_rate():
     # at a hardcoded 200 Hz it would be 80 samples and this must raise.
     out = validate_experiment_config(cfg)
     assert out.windowing.resolve(sampling_rate=100.0) == (40, 10)
+
+
+def test_cv_config_defaults_disabled():
+    from hand_gesture_recognition.configuration.schema import CrossValidationConfig
+
+    cv = CrossValidationConfig()
+    assert cv.enabled is False
+    assert cv.method == "kfold"
+
+
+def test_cv_config_validation_rejects_bad_method():
+    from hand_gesture_recognition.configuration.schema import (
+        CrossValidationConfig,
+    )
+
+    with pytest.raises(ConfigValidationError):
+        CrossValidationConfig(method="bogus").validate()
+
+
+def test_visualization_config_defaults():
+    from hand_gesture_recognition.configuration.schema import (
+        FeatureOverWindowsConfig,
+        VisualizationConfig,
+    )
+
+    v = VisualizationConfig()
+    assert v.enabled is True
+    assert v.consistent_scale is True
+    assert v.feature_over_windows.enabled is True
+    assert v.feature_over_windows.features == []
+
+
+def test_experiment_config_has_cv_and_visualization():
+    cfg = _base_experiment()
+    assert cfg.cv.enabled is False
+    assert cfg.visualization.enabled is True

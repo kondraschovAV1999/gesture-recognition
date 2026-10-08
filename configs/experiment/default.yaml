@@ -7,4 +7,3 @@ tracking:
   experiment_name: hand_gesture_recognition
 reporting:
   formats: [json, html]
-  visualize: true

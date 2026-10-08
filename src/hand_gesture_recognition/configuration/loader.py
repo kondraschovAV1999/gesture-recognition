@@ -14,15 +14,19 @@ from hand_gesture_recognition.configuration.schema import (
     AnalyticsConfig,
     BaselineConfig,
     ClassicalConfig,
+    CrossValidationConfig,
     DatasetConfig,
     EvaluationConfig,
     ExperimentConfig,
+    FeatureOverWindowsConfig,
     GestureCropConfig,
     NeuralConfig,
     ReportingConfig,
     SCHEMA_VERSION,
     SplitConfig,
     TrackingConfig,
+    VisualizationConfig,
+    VisualizationSelectionConfig,
     WindowingConfig,
     validate_experiment_config,
 )
@@ -39,6 +43,9 @@ def _coerce(d: Dict[str, Any]) -> ExperimentConfig:
     always receives typed sub-configs (DatasetConfig, SplitConfig, ...) rather
     than plain dicts.
     """
+    vis_raw = d.get("visualization", {})
+    sel_raw = vis_raw.get("selection", {})
+    fow_raw = vis_raw.get("feature_over_windows", {})
     return ExperimentConfig(
         run_id=d.get("run_id"),
         backend=d.get("backend", "classical"),
@@ -57,6 +64,14 @@ def _coerce(d: Dict[str, Any]) -> ExperimentConfig:
         analytics=AnalyticsConfig(**d.get("analytics", {})),
         tracking=TrackingConfig(**d.get("tracking", {})),
         reporting=ReportingConfig(**d.get("reporting", {})),
+        visualization=VisualizationConfig(
+            enabled=vis_raw.get("enabled", True),
+            consistent_scale=vis_raw.get("consistent_scale", True),
+            selection=VisualizationSelectionConfig(**sel_raw),
+            stage_progression=vis_raw.get("stage_progression", True),
+            feature_over_windows=FeatureOverWindowsConfig(**fow_raw),
+        ),
+        cv=CrossValidationConfig(**d.get("cv", {})),
     )
 
 

@@ -118,6 +118,57 @@ class SplitConfig:
             raise ConfigValidationError(f"unknown split strategy: {self.strategy}")
 
 
+@dataclass
+class CrossValidationConfig:
+    enabled: bool = False
+    method: str = "kfold"  # kfold | loso
+    n_splits: int = 5  # kfold only
+    group_folds: bool = True  # kfold only: subject-wise vs trial-level
+    include_val: bool = True
+    val_ratio: float = 0.2  # fraction of the training fold carved into val
+    seed: int = 42
+    report_per_fold: bool = True
+
+    def validate(self) -> None:
+        if self.method not in ("kfold", "loso"):
+            raise ConfigValidationError(f"unknown cv method: {self.method!r}")
+        if self.method == "kfold" and self.n_splits < 2:
+            raise ConfigValidationError(
+                f"cv.n_splits must be >= 2, got {self.n_splits}"
+            )
+        if not (0.0 < self.val_ratio < 1.0):
+            raise ConfigValidationError(
+                f"cv.val_ratio must be in (0,1), got {self.val_ratio}"
+            )
+
+
+@dataclass
+class VisualizationSelectionConfig:
+    gestures: List[str] = field(default_factory=list)  # [] = all classes
+    channels: List[int] = field(default_factory=list)  # [] = all channels (1-based)
+    by_gesture: Dict[str, List[int]] = field(default_factory=dict)
+
+
+@dataclass
+class FeatureOverWindowsConfig:
+    enabled: bool = True
+    features: List[str] = field(default_factory=list)  # names; [] = all
+    max_windows: int = 0  # 0 = all
+
+
+@dataclass
+class VisualizationConfig:
+    enabled: bool = True
+    consistent_scale: bool = True
+    selection: VisualizationSelectionConfig = field(
+        default_factory=VisualizationSelectionConfig
+    )
+    stage_progression: bool = True
+    feature_over_windows: FeatureOverWindowsConfig = field(
+        default_factory=FeatureOverWindowsConfig
+    )
+
+
 _CLASSICAL_FEATURE_TYPES = ("time_domain", "frequency_domain", "combined", "custom")
 
 _TIME_DOMAIN_FEATURE = {
@@ -242,7 +293,6 @@ class TrackingConfig:
 @dataclass
 class ReportingConfig:
     formats: List[str] = field(default_factory=lambda: ["json", "html"])
-    visualize: bool = True
 
 
 @dataclass
@@ -264,6 +314,8 @@ class ExperimentConfig:
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
     tracking: TrackingConfig = field(default_factory=TrackingConfig)
     reporting: ReportingConfig = field(default_factory=ReportingConfig)
+    cv: CrossValidationConfig = field(default_factory=CrossValidationConfig)
+    visualization: VisualizationConfig = field(default_factory=VisualizationConfig)
 
 
 def validate_experiment_config(cfg: ExperimentConfig) -> ExperimentConfig:
@@ -275,6 +327,7 @@ def validate_experiment_config(cfg: ExperimentConfig) -> ExperimentConfig:
         raise ConfigValidationError("seed must be set for reproducibility")
     cfg.split.validate()
     cfg.classical.validate()
+    cfg.cv.validate()
     # Validate windowing consistency against the configured sampling rate.
     cfg.windowing.resolve(sampling_rate=cfg.dataset.sampling_rate)
     if not cfg.dataset.include_no_gesture and 0 in cfg.evaluation.exclude_classes:
