@@ -161,7 +161,9 @@ def test_stage_label_and_compute_stages_order():
     assert stage_label(steps[0]) == "rectified"
 
 
-def test_plot_stage_progression_one_figure_per_stage_gesture(tmp_path):
+def test_plot_stage_progression_grid(tmp_path, monkeypatch):
+    import matplotlib.pyplot as plt
+
     ds = make_synthetic_dataset(
         n_subjects=2,
         n_trials_per_subject=3,
@@ -173,14 +175,24 @@ def test_plot_stage_progression_one_figure_per_stage_gesture(tmp_path):
     steps = [
         {"_target_": "hand_gesture_recognition.preprocessing.signal.RectifyTransformer"}
     ]
-    stages = compute_stages(ds, steps, None)
+    stages = compute_stages(ds, steps, None)  # [("raw", ds), ("rectified", ds)]
     selection = {"class_0": [0, 1]}
+
+    shapes = []
+    orig_subplots = plt.subplots
+
+    def spy(*args, **kwargs):
+        shapes.append((args[0], args[1]))
+        return orig_subplots(*args, **kwargs)
+
+    monkeypatch.setattr(plt, "subplots", spy)
+
     paths = plot_stage_progression(
         stages, selection, ds.metadata.class_names, True, str(tmp_path)
     )
-    assert len(paths) == 2  # (raw, class_0) and (rectified, class_0)
-    assert os.path.exists(str(tmp_path / "stage_progression_raw_class_0.png"))
-    assert os.path.exists(str(tmp_path / "stage_progression_rectified_class_0.png"))
+    assert len(paths) == 1  # one figure per gesture (not per stage)
+    assert os.path.exists(str(tmp_path / "stage_progression_class_0.png"))
+    assert shapes == [(2, 2)]  # rows = channels (2), columns = stages (2)
 
 
 def test_plot_feature_over_windows(tmp_path):

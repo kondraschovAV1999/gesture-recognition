@@ -22,7 +22,7 @@ def test_visualization_config_produces_selected_plots(tmp_path, monkeypatch):
     runner.run()
     out = tmp_path / "output" / "evaluation" / cfg.run_id
     assert (out / "raw_signal_class_0.png").exists()
-    assert (out / "stage_progression_raw_class_0.png").exists()
+    assert (out / "stage_progression_class_0.png").exists()
     assert (out / "feature_over_windows_class_0.png").exists()
     # selection limited to class_0, so class_1 artifacts are absent
     assert not (out / "raw_signal_class_1.png").exists()

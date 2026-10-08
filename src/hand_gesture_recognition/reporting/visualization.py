@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import replace
 from typing import Dict, List, Optional, Tuple
 
@@ -161,10 +160,6 @@ def plot_raw_signal_by_class(
     return paths
 
 
-def _slug(label: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9_-]+", "_", label).strip("_") or "stage"
-
-
 def stage_label(step_cfg: Dict) -> str:
     target = str(step_cfg.get("_target_", ""))
     cls = target.rsplit(".", 1)[-1]
@@ -203,40 +198,6 @@ def compute_stages(
     return stages
 
 
-def _plot_stage_channels(
-    ds: Dataset,
-    tid: str,
-    channels: List[int],
-    label: str,
-    gesture: str,
-    consistent_scale: bool,
-    path: str,
-):
-    i = _trial_index(ds, tid)
-    trial = ds.trials[i]
-    fs = ds.metadata.sampling_rate
-    fig, axes = plt.subplots(
-        len(channels), 1, figsize=(12, 1.9 * len(channels)), squeeze=False
-    )
-    axes = axes[:, 0]
-    t = np.arange(trial.shape[0]) / fs
-    plotted = []
-    for row, c in enumerate(channels):
-        axes[row].plot(t, trial[:, c], lw=0.6)
-        axes[row].set_ylabel(f"ch{c + 1}")
-        plotted.append(trial[:, c])
-    if consistent_scale:
-        _shared_ylim(axes, plotted)
-    axes[0].set_title(f"{gesture} — {label}")
-    axes[-1].set_xlabel("time (s)")
-    fig.tight_layout()
-    if path:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        fig.savefig(path, dpi=110)
-        plt.close(fig)
-    return fig
-
-
 def plot_stage_progression(
     stages: List[Tuple[str, Dataset]],
     selection: Dict[str, List[int]],
@@ -244,7 +205,8 @@ def plot_stage_progression(
     consistent_scale: bool,
     run_dir: str,
 ) -> List[str]:
-    """One figure per (stage, gesture), showing the gesture's selected channels."""
+    """One figure per selected gesture: rows = channels, columns = stages,
+    sharing one y-scale across the whole figure."""
     paths: List[str] = []
     if not stages:
         return paths
@@ -253,24 +215,64 @@ def plot_stage_progression(
         return paths
     names = class_names if class_names is not None else raw.metadata.class_names
     present = set(int(l) for l in np.unique(raw.labels))
-    for label, ds in stages:
-        for g_name, channels in selection.items():
-            try:
-                g_idx = names.index(g_name)
-            except ValueError:
-                continue
-            if g_idx not in present:
-                continue
-            idx = np.where(raw.labels == g_idx)[0]
-            tid = str(raw.trial_ids[idx[0]])
-            path = os.path.join(
-                run_dir, f"stage_progression_{_slug(label)}_{g_name}.png"
-            )
-            _plot_stage_channels(
-                ds, tid, channels, label, g_name, consistent_scale, path
-            )
-            paths.append(path)
+    stage_labels = [label for label, _ in stages]
+    for g_name, channels in selection.items():
+        try:
+            g_idx = names.index(g_name)
+        except ValueError:
+            continue
+        if g_idx not in present:
+            continue
+        idx = np.where(raw.labels == g_idx)[0]
+        tid = str(raw.trial_ids[idx[0]])
+        path = os.path.join(run_dir, f"stage_progression_{g_name}.png")
+        _plot_stage_grid(
+            stages, tid, channels, stage_labels, g_name, consistent_scale, path
+        )
+        paths.append(path)
     return paths
+
+
+def _plot_stage_grid(
+    stages: List[Tuple[str, Dataset]],
+    tid: str,
+    channels: List[int],
+    stage_labels: List[str],
+    gesture: str,
+    consistent_scale: bool,
+    path: str,
+):
+    """Grid of the example trial at every stage: rows = channels, columns =
+    stages, one shared y-scale across all cells when consistent_scale."""
+    fs = stages[0][1].metadata.sampling_rate
+    trial_indices = [_trial_index(ds, tid) for _, ds in stages]
+    n_ch = len(channels)
+    n_st = len(stages)
+    fig, axes = plt.subplots(
+        n_ch, n_st, figsize=(3.0 * n_st, 1.8 * n_ch), squeeze=False
+    )
+    traces = []
+    for r, ch in enumerate(channels):
+        for c, (_, ds) in enumerate(stages):
+            trial = ds.trials[trial_indices[c]]
+            t = np.arange(trial.shape[0]) / fs
+            axes[r, c].plot(t, trial[:, ch], lw=0.6)
+            traces.append(trial[:, ch])
+            if r == 0:
+                axes[r, c].set_title(stage_labels[c], fontsize=8)
+            if c == 0:
+                axes[r, c].set_ylabel(f"ch{ch + 1}")
+    if consistent_scale:
+        _shared_ylim(axes.flat, traces)
+    for c in range(n_st):
+        axes[n_ch - 1, c].set_xlabel("time (s)")
+    fig.suptitle(f"stage progression — {gesture}")
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
+    if path:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fig.savefig(path, dpi=110)
+        plt.close(fig)
+    return fig
 
 
 def _feature_matrix(X: np.ndarray, sampling_rate: float):
