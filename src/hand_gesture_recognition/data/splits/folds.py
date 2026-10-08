@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Tuple
 
 import numpy as np
-from sklearn.model_selection import GroupKFold, KFold, LeaveOneGroupOut
+from sklearn.model_selection import GroupKFold, KFold
 
 from hand_gesture_recognition.configuration.schema import (
     CrossValidationConfig,
@@ -48,10 +48,6 @@ def _carve_val_trial(
     return shuffled[n_val:], shuffled[:n_val]
 
 
-def _empty(dataset: Dataset) -> Dataset:
-    return _subset(dataset, np.asarray([], dtype=int))
-
-
 def generate_folds(
     dataset: Dataset, cv: CrossValidationConfig, split: SplitConfig
 ) -> List[DataSplit]:
@@ -76,13 +72,13 @@ def generate_folds(
             test_idx = np.where(groups == g)[0]
             train_idx = np.where(groups != g)[0]
             train_idx, val_idx = carve(train_idx)
-            folds.append(
-                DataSplit(
-                    train=_subset(dataset, train_idx),
-                    val=_subset(dataset, val_idx),
-                    test=_subset(dataset, test_idx),
-                )
+            fold = DataSplit(
+                train=_subset(dataset, train_idx),
+                val=_subset(dataset, val_idx),
+                test=_subset(dataset, test_idx),
             )
+            assert_no_group_leakage(fold)
+            folds.append(fold)
         return folds
 
     # kfold
@@ -91,13 +87,13 @@ def generate_folds(
         splitter = GroupKFold(n_splits=cv.n_splits)
         for train_idx, test_idx in splitter.split(indices, groups=groups):
             train_idx, val_idx = carve(train_idx)
-            folds.append(
-                DataSplit(
-                    train=_subset(dataset, train_idx),
-                    val=_subset(dataset, val_idx),
-                    test=_subset(dataset, test_idx),
-                )
+            fold = DataSplit(
+                train=_subset(dataset, train_idx),
+                val=_subset(dataset, val_idx),
+                test=_subset(dataset, test_idx),
             )
+            assert_no_group_leakage(fold)
+            folds.append(fold)
     else:
         splitter = KFold(n_splits=cv.n_splits, shuffle=True, random_state=cv.seed)
         for train_idx, test_idx in splitter.split(indices):

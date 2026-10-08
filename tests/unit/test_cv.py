@@ -1,5 +1,3 @@
-import numpy as np
-
 from hand_gesture_recognition.configuration.schema import (
     CrossValidationConfig,
     SplitConfig,

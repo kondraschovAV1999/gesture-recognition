@@ -489,13 +489,19 @@ class ExperimentRunner:
             if raw_dataset.metadata.channels
             else (raw_dataset.trials[0].shape[1] if raw_dataset.trials else 0)
         )
-        selection = resolve_selection(vis.selection, class_names, n_channels)
+        # Plots A/B/C operate on raw_dataset/processed_dataset, which carry the
+        # ORIGINAL labels (including noGesture at index 0). `class_names` here is
+        # the REMAPPED list (post no-gesture drop), so resolving against it would
+        # mislabel those datasets. Use the original class names for selection and
+        # plots A/B/C; the prediction overlays below keep the remapped names.
+        raw_class_names = raw_dataset.metadata.class_names
+        selection = resolve_selection(vis.selection, raw_class_names, n_channels)
 
         # A: raw signal per selected gesture/channel
         for p in plot_raw_signal_by_class(
             raw_dataset,
             run_dir,
-            class_names=class_names,
+            class_names=raw_class_names,
             selection=selection,
             consistent_scale=vis.consistent_scale,
         ):
@@ -507,7 +513,7 @@ class ExperimentRunner:
                 raw_dataset, self.cfg.signal_processing, viz_baseline
             )
             for p in plot_stage_progression(
-                stages, selection, class_names, vis.consistent_scale, run_dir
+                stages, selection, raw_class_names, vis.consistent_scale, run_dir
             ):
                 self.tracker.log_artifact(p)
 
@@ -519,7 +525,7 @@ class ExperimentRunner:
                 selection,
                 vis.feature_over_windows.features,
                 vis.feature_over_windows.max_windows,
-                class_names,
+                raw_class_names,
                 run_dir,
             ):
                 self.tracker.log_artifact(p)
