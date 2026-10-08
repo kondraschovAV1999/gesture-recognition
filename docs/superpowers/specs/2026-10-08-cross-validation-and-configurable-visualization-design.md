@@ -209,9 +209,10 @@ selected channels (subplots), with consistent scale.
 
 ### 4.4 Plot B — stage progression
 
-Stages = `["raw"] + [label per signal_processing step] + ["baseline_removed"
-if baseline enabled]`. Step labels derive from the transformer (e.g.
-`bandpass(10-95Hz)`, `notch(60Hz)`, `rectified`, `envelope`).
+Stages follow the **training path order**: `["raw"] + (["baseline_removed"] if
+baseline enabled) + [label per signal_processing step]`. Step labels derive
+from the transformer (e.g. `bandpass(10-95Hz)`, `notch(60Hz)`, `rectified`,
+`envelope`).
 
 Layout: **one figure per (stage, gesture) combination**. Each figure shows all
 selected channels for that gesture (one subplot per channel, shared y-scale).
@@ -219,8 +220,10 @@ Filenames: `stage_progression_{stage}_{gesture}.png`.
 
 Requires snapshotting intermediate signals — new helper
 `compute_stages(dataset, signal_processing_steps, baseline_remover) ->
-List[(label, Dataset)]`. The baseline remover used for visualization is fitted
-on the full (cropped) dataset for diagnostics.
+List[(label, Dataset)]`, applying baseline removal first, then each signal
+processing step. The baseline remover used for visualization is fitted on the
+full (cropped) dataset for diagnostics (in single-split mode it can reuse the
+train-fitted remover, but the full-dataset fit keeps CV mode consistent).
 
 ### 4.5 Plot C — feature-over-windows
 
@@ -229,7 +232,8 @@ selected channels; each cell plots that feature's value over windows (x =
 window index). Within a feature row, channels share y-scale (features have
 different units, so no cross-feature scale).
 
-Computation: window the selected (processed) trial → apply both the
+Computation: window the selected **processed** trial (baseline removal first,
+then signal processing — matching the training path) → apply both the
 time-domain and frequency-domain extractors → `(n_windows, 11 * n_channels)`
 matrix → select by (feature name, channel).
 
@@ -276,13 +280,15 @@ cropped ──► (single) split_dataset   OR   generate_folds (cv)
 
 ## Risks & notes
 
-- **Baseline/signal-processing order inconsistency (pre-existing):** the
-  training path applies baseline removal *before* signal processing, while the
-  visualization `processed_dataset` applies signal processing *then* baseline.
-  This spec uses the user-stated order (filter → rectify → baseline) for the
-  stage-progression plot and feature-over-windows, and does **not** change the
-  training pipeline. If the training order should be reconciled, that is a
-  separate follow-up.
+- **Visualization follows the training path:** baseline removal is applied
+  *before* signal processing everywhere (stage-progression stages, the
+  `processed_dataset` used by feature-over-windows, and the existing
+  signal-processing comparison). The runner's `processed_dataset` construction
+  changes from `baseline(signal_processing(cropped))` to
+  `signal_processing(baseline(cropped))` — i.e. `baseline` first, then
+  `signal_processing` — to match the training pipeline.
+- **CV-mode baseline for visualization:** fitted on the full (cropped) dataset
+  (diagnostic approximation), since there is no single train split to fit on.
 - **Neural CV cost:** N fits per run; accepted as inherent.
 - **Empty val fold** (include_val=false): runner skips val predict/evaluate and
   the val report entry.
