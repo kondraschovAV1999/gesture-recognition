@@ -26,18 +26,25 @@ Runs are also tracked in MLflow (SQLite):
 mlflow ui --backend-store-uri sqlite:///mlflow.db
 ```
 
+For a full reference of every config group and its fields, see
+[Configuring the Project](configuration.md).
+
 ## Common overrides
 
 | Override | Effect |
 |---|---|
 | `dataset.name=synthetic` | use the fast synthetic fixture |
 | `dataset.loader.subjects=[train:user1,train:user2,...]` | load a subset of the real EPN612 data |
-| `split.strategy=subject_wise` / `random` / `predefined` | choose the split strategy |
+| `split.strategy=subject_wise` / `random` / `trial_wise` / `predefined` | choose the split strategy |
 | `backend=classical` / `neural` | choose the pipeline |
 | `classical.feature_type=time_domain` / `frequency_domain` / `combined` / `custom` | choose the handcrafted feature representation (classical) |
 | `neural=dnn` / `lstm` / `cnn` / `cnn_lstm` | choose the neural model (incl. the composite CNN + LSTM) |
 | `neural.trainer.max_epochs=10` | set training epochs |
 | `windowing.window_size_seconds=0.2` `windowing.stride_seconds=0.05` | window size / stride |
+| `cv=kfold` / `cv=loso` / `cv=none` | cross-validation (fold mean ± std) or single split |
+| `cv.group_folds=false` | trial-level (non-subject-wise) CV folds |
+| `visualization.selection.gestures=[fist,open]` | which gestures to plot |
+| `visualization.selection.channels=[1,2]` | which channels to show (1-based) |
 | `reporting.formats=[json,html]` | report formats |
 | `dataset.include_no_gesture=false` | drop the `noGesture`/rest class: 5-class (gesture-only) pipeline |
 

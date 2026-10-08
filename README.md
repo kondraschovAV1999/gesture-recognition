@@ -54,6 +54,7 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db
 | Doc | What it covers |
 |---|---|
 | [Architecture & data flow](docs/architecture/overview.md) | Component layers, the pipeline, data flow, design decisions |
+| [Configuring the project](docs/experiments/configuration.md) | Every config group and field: dataset, split, CV, windowing, signal processing, models, visualization |
 | [Running experiments](docs/experiments/running.md) | CLI, config overrides, Python API, replay, MLflow |
 | [Switching & extending components](docs/development/extending.md) | How to add/swap loaders, models, features, reporters |
 | [EMG-EPN612 dataset](docs/datasets/epn612.md) | Dataset structure, fields, and the A1 split strategy |

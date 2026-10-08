@@ -23,12 +23,16 @@ configs/
 ├── config.yaml              # the defaults list (which config each group uses)
 ├── dataset/                 # dataset loaders
 ├── split/                   # split strategies
+├── cv/                      # cross-validation (none/kfold/loso)
 ├── windowing/               # window size/stride
 ├── signal_processing/       # deterministic signal transforms (before split)
+├── gesture_crop/            # crop trials to the gesture segment
+├── baseline/                # global rest-baseline removal
 ├── classical/               # classical preprocessing/features/model
 ├── neural/                  # neural datamodule/optimizer/model/trainer
 ├── evaluation/              # metrics
 ├── analytics/               # analytics flags
+├── visualization/           # plot selection/scale/stage/feature plots
 └── experiment/              # backend, seed, tracking, reporting
 ```
 
