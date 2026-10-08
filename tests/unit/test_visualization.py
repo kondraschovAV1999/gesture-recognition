@@ -5,6 +5,8 @@ import numpy as np
 
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.configuration.schema import WindowingConfig
+from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
+from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
 from hand_gesture_recognition.reporting.visualization import (
     plot_fft_spectrum,
     plot_raw_signal_by_class,
@@ -60,3 +62,21 @@ def test_plot_fft_spectrum(tmp_path):
     fig = plot_fft_spectrum(ds, windowing, path=path)
     assert fig is not None
     assert os.path.exists(path)
+
+
+def test_feature_name_constants():
+    assert TimeDomainFeatures.FEATURE_NAMES == [
+        "rms",
+        "std",
+        "min",
+        "max",
+        "mean",
+        "max_over_mean",
+        "min_over_max",
+    ]
+    assert FrequencyDomainFeatures.FEATURE_NAMES == [
+        "total_power",
+        "peak_frequency",
+        "mean_frequency",
+        "median_frequency",
+    ]

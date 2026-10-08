@@ -11,6 +11,16 @@ class TimeDomainFeatures(BaseEstimator, TransformerMixin):
     max, mean, max/mean, min/max. Output shape: (n_windows, 7 * n_channels).
     """
 
+    FEATURE_NAMES = [
+        "rms",
+        "std",
+        "min",
+        "max",
+        "mean",
+        "max_over_mean",
+        "min_over_max",
+    ]
+
     def fit(self, X, y=None):
         return self
 

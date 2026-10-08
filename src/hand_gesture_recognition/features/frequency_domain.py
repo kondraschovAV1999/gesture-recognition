@@ -35,6 +35,13 @@ class FrequencyDomainFeatures(BaseEstimator, TransformerMixin):
         Remove the mean of each window before computing the FFT.
     """
 
+    FEATURE_NAMES = [
+        "total_power",
+        "peak_frequency",
+        "mean_frequency",
+        "median_frequency",
+    ]
+
     def __init__(
         self,
         sampling_rate: float,
