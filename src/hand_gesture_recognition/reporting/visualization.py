@@ -15,6 +15,8 @@ from hydra.utils import instantiate
 from hand_gesture_recognition.configuration.schema import VisualizationSelectionConfig
 from hand_gesture_recognition.data.datasets.base import Dataset
 from hand_gesture_recognition.data.windowing.base import window_dataset
+from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
+from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
 from hand_gesture_recognition.prediction.base import Prediction
 
 
@@ -269,6 +271,104 @@ def plot_stage_progression(
             )
             paths.append(path)
     return paths
+
+
+def _feature_matrix(X: np.ndarray, sampling_rate: float):
+    """(n_windows, 11*n_channels) matrix + flattened per-column names."""
+    td = TimeDomainFeatures().transform(X)
+    fd = FrequencyDomainFeatures(sampling_rate=sampling_rate).transform(X)
+    n_ch = X.shape[-1]
+    td_names = [
+        f"{n}_ch{c + 1}" for n in TimeDomainFeatures.FEATURE_NAMES for c in range(n_ch)
+    ]
+    fd_names = [
+        f"{n}_ch{c + 1}"
+        for n in FrequencyDomainFeatures.FEATURE_NAMES
+        for c in range(n_ch)
+    ]
+    return np.concatenate([td, fd], axis=1), td_names + fd_names
+
+
+def plot_feature_over_windows(
+    processed_dataset: Dataset,
+    windowing,
+    selection: Dict[str, List[int]],
+    features: List[str],
+    max_windows: int,
+    class_names: List[str],
+    run_dir: str,
+) -> List[str]:
+    """One figure per selected gesture: rows = features, cols = channels,
+    value vs window index."""
+    paths: List[str] = []
+    if processed_dataset.n_trials == 0:
+        return paths
+    names = (
+        class_names
+        if class_names is not None
+        else processed_dataset.metadata.class_names
+    )
+    present = set(int(l) for l in np.unique(processed_dataset.labels))
+    wd = window_dataset(processed_dataset, windowing)
+    if wd.X.shape[0] == 0:
+        return paths
+    fs = processed_dataset.metadata.sampling_rate
+    X_feat, feat_names = _feature_matrix(wd.X, fs)
+
+    for g_name, channels in selection.items():
+        try:
+            g_idx = names.index(g_name)
+        except ValueError:
+            continue
+        if g_idx not in present:
+            continue
+        idx = np.where(processed_dataset.labels == g_idx)[0]
+        tid = str(processed_dataset.trial_ids[idx[0]])
+        mask = wd.metadata.trial_ids == tid
+        if not mask.any():
+            continue
+        path = os.path.join(run_dir, f"feature_over_windows_{g_name}.png")
+        _plot_features(
+            X_feat[mask], feat_names, channels, features, max_windows, g_name, path
+        )
+        paths.append(path)
+    return paths
+
+
+def _plot_features(X_feat, feat_names, channels, features, max_windows, g_name, path):
+    wanted = features or list(dict.fromkeys(n.rsplit("_ch", 1)[0] for n in feat_names))
+    if max_windows and X_feat.shape[0] > max_windows:
+        X_feat = X_feat[:max_windows]
+    fig, axes = plt.subplots(
+        len(wanted),
+        len(channels),
+        figsize=(2.5 * len(channels), 1.8 * len(wanted)),
+        squeeze=False,
+    )
+    w = np.arange(X_feat.shape[0])
+    for r, feat in enumerate(wanted):
+        row_traces = []
+        for c_idx, ch in enumerate(channels):
+            col = f"{feat}_ch{ch + 1}"
+            ax = axes[r, c_idx]
+            if col in feat_names:
+                j = feat_names.index(col)
+                ax.plot(w, X_feat[:, j], lw=0.8)
+                row_traces.append(X_feat[:, j])
+            else:
+                ax.set_visible(False)
+            ax.set_xlabel("window")
+            if c_idx == 0:
+                ax.set_ylabel(feat)
+        if row_traces:
+            _shared_ylim(axes[r, :], row_traces)
+    axes[0, 0].set_title(f"features over windows — {g_name}")
+    fig.tight_layout()
+    if path:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fig.savefig(path, dpi=110)
+        plt.close(fig)
+    return fig
 
 
 def plot_predictions_on_signal(

@@ -13,6 +13,7 @@ from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
 from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
 from hand_gesture_recognition.reporting.visualization import (
     compute_stages,
+    plot_feature_over_windows,
     plot_fft_spectrum,
     plot_raw_signal,
     plot_raw_signal_by_class,
@@ -180,3 +181,21 @@ def test_plot_stage_progression_one_figure_per_stage_gesture(tmp_path):
     assert len(paths) == 2  # (raw, class_0) and (rectified, class_0)
     assert os.path.exists(str(tmp_path / "stage_progression_raw_class_0.png"))
     assert os.path.exists(str(tmp_path / "stage_progression_rectified_class_0.png"))
+
+
+def test_plot_feature_over_windows(tmp_path):
+    ds = make_synthetic_dataset(
+        n_subjects=2,
+        n_trials_per_subject=3,
+        n_classes=2,
+        length=100,
+        n_channels=4,
+        seed=0,
+    )
+    windowing = WindowingConfig(window_size_samples=40, stride_samples=20)
+    selection = {"class_0": [0, 1]}
+    paths = plot_feature_over_windows(
+        ds, windowing, selection, ["rms"], 0, ds.metadata.class_names, str(tmp_path)
+    )
+    assert len(paths) == 1
+    assert os.path.exists(str(tmp_path / "feature_over_windows_class_0.png"))
