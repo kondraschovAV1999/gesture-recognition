@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import replace
 from typing import Dict, List, Optional, Tuple
 
@@ -9,6 +10,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from hydra.utils import instantiate
 
 from hand_gesture_recognition.configuration.schema import VisualizationSelectionConfig
 from hand_gesture_recognition.data.datasets.base import Dataset
@@ -154,6 +156,118 @@ def plot_raw_signal_by_class(
         path = os.path.join(run_dir, f"raw_signal_{name}.png")
         plot_raw_signal(dataset, example_tid=tid, path=path)
         paths.append(path)
+    return paths
+
+
+def _slug(label: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]+", "_", label).strip("_") or "stage"
+
+
+def stage_label(step_cfg: Dict) -> str:
+    target = str(step_cfg.get("_target_", ""))
+    cls = target.rsplit(".", 1)[-1]
+    if cls == "ButterworthFilter":
+        t = step_cfg.get("type")
+        if t == "bandpass":
+            return f"bandpass_{step_cfg.get('lowcut')}_{step_cfg.get('highcut')}"
+        if t == "notch":
+            return f"notch_{step_cfg.get('frequency')}"
+        if t == "lowpass":
+            return f"lowpass_{step_cfg.get('highcut')}"
+        if t == "highpass":
+            return f"highpass_{step_cfg.get('lowcut')}"
+        return str(t or "butterworth")
+    if cls == "RectifyTransformer":
+        return "rectified"
+    if cls == "EnvelopeExtractor":
+        return "envelope"
+    return cls or "step"
+
+
+def compute_stages(
+    dataset: Dataset, signal_processing_steps: List[Dict], baseline_remover=None
+) -> List[Tuple[str, Dataset]]:
+    """Snapshot the dataset at each stage, in training-path order:
+    raw -> baseline_removed (if any) -> each signal-processing step."""
+    stages: List[Tuple[str, Dataset]] = [("raw", dataset)]
+    cur = dataset
+    if baseline_remover is not None:
+        cur = baseline_remover.transform(cur)
+        stages.append(("baseline_removed", cur))
+    for step_cfg in signal_processing_steps:
+        step = instantiate(step_cfg)
+        cur = replace(cur, trials=[step.transform(t) for t in cur.trials])
+        stages.append((stage_label(step_cfg), cur))
+    return stages
+
+
+def _plot_stage_channels(
+    ds: Dataset,
+    tid: str,
+    channels: List[int],
+    label: str,
+    gesture: str,
+    consistent_scale: bool,
+    path: str,
+):
+    i = _trial_index(ds, tid)
+    trial = ds.trials[i]
+    fs = ds.metadata.sampling_rate
+    fig, axes = plt.subplots(
+        len(channels), 1, figsize=(12, 1.9 * len(channels)), squeeze=False
+    )
+    axes = axes[:, 0]
+    t = np.arange(trial.shape[0]) / fs
+    plotted = []
+    for row, c in enumerate(channels):
+        axes[row].plot(t, trial[:, c], lw=0.6)
+        axes[row].set_ylabel(f"ch{c + 1}")
+        plotted.append(trial[:, c])
+    if consistent_scale:
+        _shared_ylim(axes, plotted)
+    axes[0].set_title(f"{gesture} — {label}")
+    axes[-1].set_xlabel("time (s)")
+    fig.tight_layout()
+    if path:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fig.savefig(path, dpi=110)
+        plt.close(fig)
+    return fig
+
+
+def plot_stage_progression(
+    stages: List[Tuple[str, Dataset]],
+    selection: Dict[str, List[int]],
+    class_names: List[str],
+    consistent_scale: bool,
+    run_dir: str,
+) -> List[str]:
+    """One figure per (stage, gesture), showing the gesture's selected channels."""
+    paths: List[str] = []
+    if not stages:
+        return paths
+    raw = stages[0][1]
+    if raw.n_trials == 0:
+        return paths
+    names = class_names if class_names is not None else raw.metadata.class_names
+    present = set(int(l) for l in np.unique(raw.labels))
+    for label, ds in stages:
+        for g_name, channels in selection.items():
+            try:
+                g_idx = names.index(g_name)
+            except ValueError:
+                continue
+            if g_idx not in present:
+                continue
+            idx = np.where(raw.labels == g_idx)[0]
+            tid = str(raw.trial_ids[idx[0]])
+            path = os.path.join(
+                run_dir, f"stage_progression_{_slug(label)}_{g_name}.png"
+            )
+            _plot_stage_channels(
+                ds, tid, channels, label, g_name, consistent_scale, path
+            )
+            paths.append(path)
     return paths
 
 

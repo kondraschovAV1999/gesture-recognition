@@ -12,11 +12,14 @@ from hand_gesture_recognition.configuration.schema import (
 from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
 from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
 from hand_gesture_recognition.reporting.visualization import (
+    compute_stages,
     plot_fft_spectrum,
     plot_raw_signal,
     plot_raw_signal_by_class,
     plot_signal_processing_comparison,
+    plot_stage_progression,
     resolve_selection,
+    stage_label,
 )
 
 
@@ -137,3 +140,43 @@ def test_consistent_scale_shares_ylim():
     ylims = [tuple(ax.get_ylim()) for ax in fig.axes]
     assert ylims[0] == ylims[1] == ylims[2]
     plt.close(fig)
+
+
+def test_stage_label_and_compute_stages_order():
+    ds = make_synthetic_dataset(
+        n_subjects=1,
+        n_trials_per_subject=1,
+        n_classes=1,
+        length=100,
+        n_channels=2,
+        seed=0,
+    )
+    steps = [
+        {"_target_": "hand_gesture_recognition.preprocessing.signal.RectifyTransformer"}
+    ]
+    stages = compute_stages(ds, steps, None)
+    labels = [s[0] for s in stages]
+    assert labels == ["raw", "rectified"]
+    assert stage_label(steps[0]) == "rectified"
+
+
+def test_plot_stage_progression_one_figure_per_stage_gesture(tmp_path):
+    ds = make_synthetic_dataset(
+        n_subjects=2,
+        n_trials_per_subject=3,
+        n_classes=2,
+        length=100,
+        n_channels=4,
+        seed=0,
+    )
+    steps = [
+        {"_target_": "hand_gesture_recognition.preprocessing.signal.RectifyTransformer"}
+    ]
+    stages = compute_stages(ds, steps, None)
+    selection = {"class_0": [0, 1]}
+    paths = plot_stage_progression(
+        stages, selection, ds.metadata.class_names, True, str(tmp_path)
+    )
+    assert len(paths) == 2  # (raw, class_0) and (rectified, class_0)
+    assert os.path.exists(str(tmp_path / "stage_progression_raw_class_0.png"))
+    assert os.path.exists(str(tmp_path / "stage_progression_rectified_class_0.png"))
