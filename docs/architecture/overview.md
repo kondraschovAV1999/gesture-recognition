@@ -54,7 +54,7 @@
 | Layer | Package | Responsibility |
 |---|---|---|
 | **Configuration** | `configuration/` | Hydra schema (`ExperimentConfig` dataclasses) + the *Configuration Loading Module* — the only code allowed to call Hydra's composition API. Resolves config (compose or replay) into a validated, typed `ExperimentConfig`. |
-| **Data** | `data/` | `Dataset` representation, dataset loaders, split strategies, the **shared** windowing, and content hashing. |
+| **Data** | `data/` | `Dataset` representation, dataset loaders, [split strategies](docs/experiments/splitting.md), the **shared** windowing, and content hashing. |
 | **Prediction** | `prediction/` | The shared `Prediction` dataclass + `PredictionAdapter` interface. |
 | **Classical** | `classical/` | sklearn pipeline (windowing transformer, features, model) + the classical adapter. |
 | **Neural** | `neural/` | Lightning `DataModule`/`LightningModule`s (DNN, LSTM) + the neural adapter. |

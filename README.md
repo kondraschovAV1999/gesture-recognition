@@ -57,6 +57,7 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db
 | [Running experiments](docs/experiments/running.md) | CLI, config overrides, Python API, replay, MLflow |
 | [Switching & extending components](docs/development/extending.md) | How to add/swap loaders, models, features, reporters |
 | [EMG-EPN612 dataset](docs/datasets/epn612.md) | Dataset structure, fields, and the A1 split strategy |
+| [Splitting strategies](docs/experiments/splitting.md) | Trial-level vs subject-wise splits, leakage, and choosing a strategy |
 
 ## Project layout
 
