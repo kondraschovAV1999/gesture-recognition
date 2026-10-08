@@ -7,6 +7,8 @@ from hand_gesture_recognition.configuration.schema import (
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.data.splits.base import assert_no_group_leakage
 from hand_gesture_recognition.data.splits.folds import generate_folds
+from hand_gesture_recognition.evaluation.aggregate import aggregate_folds
+from hand_gesture_recognition.evaluation.base import EvaluationResult
 
 
 def test_kfold_group_folds_no_leakage():
@@ -57,3 +59,20 @@ def test_kfold_group_val_carved_from_train():
     for f in folds:
         assert f.val.n_trials > 0
         assert_no_group_leakage(f)
+
+
+def test_aggregate_folds_mean_std():
+    results = [
+        EvaluationResult(
+            run_id="r", dataset_id="d", metrics={"accuracy": 0.9, "macro_f1": 0.8}
+        ),
+        EvaluationResult(
+            run_id="r", dataset_id="d", metrics={"accuracy": 0.7, "macro_f1": 0.6}
+        ),
+    ]
+    agg = aggregate_folds(results, "r", "d")
+    assert agg.metrics["accuracy"] == 0.8
+    assert abs(agg.metrics["accuracy_std"] - 0.1) < 1e-9
+    assert agg.metrics["macro_f1"] == 0.7
+    assert agg.run_id == "r"
+    assert agg.dataset_id == "d"
