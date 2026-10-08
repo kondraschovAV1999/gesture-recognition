@@ -466,22 +466,65 @@ class ExperimentRunner:
         viz_baseline=None,
         is_cv=False,
     ) -> None:
-        if not self.cfg.visualization.enabled:
+        vis = self.cfg.visualization
+        if not vis.enabled:
             return
-        # TEMPORARY: existing body, minus the reporting.visualize guard, will be
-        # fully replaced in Task 12. Keep the current plot calls as-is for now.
         from hand_gesture_recognition.reporting.visualization import (
+            compute_stages,
             plot_fft_spectrum,
+            plot_feature_over_windows,
             plot_predictions_on_signal,
             plot_raw_signal_by_class,
             plot_signal_data_flow,
             plot_signal_processing_comparison,
+            plot_stage_progression,
+            resolve_selection,
         )
 
         run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)
         os.makedirs(run_dir, exist_ok=True)
-        for p in plot_raw_signal_by_class(raw_dataset, run_dir, None):
+
+        n_channels = (
+            len(raw_dataset.metadata.channels)
+            if raw_dataset.metadata.channels
+            else (raw_dataset.trials[0].shape[1] if raw_dataset.trials else 0)
+        )
+        selection = resolve_selection(vis.selection, class_names, n_channels)
+
+        # A: raw signal per selected gesture/channel
+        for p in plot_raw_signal_by_class(
+            raw_dataset,
+            run_dir,
+            class_names=class_names,
+            selection=selection,
+            consistent_scale=vis.consistent_scale,
+        ):
             self.tracker.log_artifact(p)
+
+        # B: stage progression (one figure per (stage, gesture))
+        if vis.stage_progression:
+            stages = compute_stages(
+                raw_dataset, self.cfg.signal_processing, viz_baseline
+            )
+            for p in plot_stage_progression(
+                stages, selection, class_names, vis.consistent_scale, run_dir
+            ):
+                self.tracker.log_artifact(p)
+
+        # C: feature-over-windows (one figure per gesture)
+        if vis.feature_over_windows.enabled:
+            for p in plot_feature_over_windows(
+                processed_dataset,
+                self.cfg.windowing,
+                selection,
+                vis.feature_over_windows.features,
+                vis.feature_over_windows.max_windows,
+                class_names,
+                run_dir,
+            ):
+                self.tracker.log_artifact(p)
+
+        # Prediction overlay + data flow: single-split only.
         if not is_cv:
             for part, ds, pred in (
                 ("val", split.val, predictions.val),
@@ -492,10 +535,12 @@ class ExperimentRunner:
                     ds, pred, self.cfg.windowing, class_names, path=p
                 )
                 self.tracker.log_artifact(p)
+
         if self.cfg.signal_processing:
             p = os.path.join(run_dir, "signal_processing_comparison.png")
             plot_signal_processing_comparison(raw_dataset, processed_dataset, path=p)
             self.tracker.log_artifact(p)
+
         if not is_cv:
             p = os.path.join(run_dir, "signal_data_flow.png")
             plot_signal_data_flow(
@@ -508,6 +553,7 @@ class ExperimentRunner:
                 path=p,
             )
             self.tracker.log_artifact(p)
+
         feature_specs = self.cfg.classical.resolve_features(
             self.cfg.dataset.sampling_rate
         )
