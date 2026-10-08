@@ -77,6 +77,7 @@ class VisualizationSelectionConfig:
 
 @dataclass
 class FeatureOverWindowsConfig:
+    enabled: bool = True
     features: List[str] = field(default_factory=list)   # feature names; [] = all
     max_windows: int = 0                                # 0 = all windows
 
