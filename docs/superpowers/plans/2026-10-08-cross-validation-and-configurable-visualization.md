@@ -13,10 +13,7 @@
 - Python 3.10 (`pyproject.toml` `requires-python = ">=3.10"`); existing deps only (scikit-learn>=1.4, numpy, pandas, hydra-core, omegaconf, mlflow, matplotlib, torch, lightning).
 - Follow existing conventions: empty `__init__.py` files, import via full module paths, typed dataclass config in `configuration/schema.py`, validation via `validate_experiment_config`.
 - Config group files use `# @package <group>` header; defaults live in `configs/config.yaml`.
-- **Pre-existing failures (DO NOT fix in this plan, but be aware):**
-  - `tests/unit/test_config_loader.py::test_gesture_crop_config_default_enabled` — stale expectation (`gesture_crop.enabled` is now `False`).
-  - All synthetic integration smoke/partition tests fail because `configs/config.yaml` defaults `baseline: default` (enabled) but `make_synthetic_dataset` has no rest trials, so `BaselineRemoval.fit` raises `ValueError`.
-  - Consequence: **every new integration test MUST override `baseline=none`.** Run only the specific test file for each task; do not rely on the full suite being green.
+- **Baseline/synthetic caveat (robustness rule):** the committed config default is `baseline: none` and the full suite is green. However, `make_synthetic_dataset` has no rest trials, so if baseline is ever enabled (e.g. `baseline=default`), `BaselineRemoval.fit` raises. **Every new integration test MUST therefore override `baseline=none`** so it stays green regardless of the ambient default. Run only the specific test file for each task (the full suite is green but slow due to neural smoke tests).
 - Run commands from the repo root: `cd "E:\Research\Dissertation\codes\hand-gesture-recognition"`.
 - On this Windows shell, `git commit -m` with spaces breaks under the conda wrapper — use hyphenated commit messages (e.g. `-m feat-add-cv-config`).
 
