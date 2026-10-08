@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from typing import List, Optional
+from dataclasses import replace
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib
 
@@ -9,6 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from hand_gesture_recognition.configuration.schema import VisualizationSelectionConfig
 from hand_gesture_recognition.data.datasets.base import Dataset
 from hand_gesture_recognition.data.windowing.base import window_dataset
 from hand_gesture_recognition.prediction.base import Prediction
@@ -34,13 +36,47 @@ def _shade_gesture(axes, g_start: int, g_end: int, fs: float) -> None:
             ax.axvspan(g_start / fs, g_end / fs, color="green", alpha=0.2)
 
 
+def _shared_ylim(axes, traces, pad=0.05):
+    """Set a single shared y-range across all axes from the given traces."""
+    lo, hi = np.inf, -np.inf
+    for arr in traces:
+        if arr is None or arr.size == 0:
+            continue
+        lo = min(lo, float(np.nanmin(arr)))
+        hi = max(hi, float(np.nanmax(arr)))
+    if not np.isfinite(lo) or not np.isfinite(hi) or lo == hi:
+        return
+    span = hi - lo
+    for ax in axes:
+        ax.set_ylim(lo - pad * span, hi + pad * span)
+
+
+def resolve_selection(
+    selection: VisualizationSelectionConfig, class_names: List[str], n_channels: int
+) -> Dict[str, List[int]]:
+    """Gesture name -> 0-based channel indices. Empty lists mean 'all'."""
+    gestures = selection.gestures or list(class_names)
+    all_channels = list(range(n_channels))
+    out: Dict[str, List[int]] = {}
+    for g in gestures:
+        ch = selection.by_gesture.get(g)
+        if ch is None:
+            ch = selection.channels
+        idx = [int(c) - 1 for c in ch] if ch else all_channels
+        out[g] = sorted(set(idx))
+    return out
+
+
 def plot_raw_signal(
     dataset: Dataset,
     example_tid: Optional[str] = None,
     path: Optional[str] = None,
+    channels: Optional[List[int]] = None,
+    consistent_scale: bool = False,
 ):
-    """One trial's raw signal: every channel on its own subplot, with the
-    ground-truth gesture segment shaded."""
+    """One trial's raw signal for the given channels (0-based), with the
+    ground-truth gesture segment shaded. When ``consistent_scale`` is true, all
+    channel subplots share one y-range."""
     if dataset.n_trials == 0:
         return None
     tid = example_tid or str(dataset.trial_ids[0])
@@ -48,13 +84,22 @@ def plot_raw_signal(
     trial = dataset.trials[i]
     fs = dataset.metadata.sampling_rate
     n_ch = trial.shape[1]
+    if channels is None:
+        channels = list(range(n_ch))
 
-    fig, axes = _channel_axes(n_ch)
+    fig, axes = plt.subplots(
+        len(channels), 1, figsize=(12, 1.9 * len(channels)), squeeze=False
+    )
+    axes = axes[:, 0]
     t = np.arange(trial.shape[0]) / fs
-    for c in range(n_ch):
-        axes[c].plot(t, trial[:, c], lw=0.6)
-        axes[c].set_ylabel(f"ch{c + 1}")
+    plotted = []
+    for row, c in enumerate(channels):
+        axes[row].plot(t, trial[:, c], lw=0.6)
+        axes[row].set_ylabel(f"ch{c + 1}")
+        plotted.append(trial[:, c])
     _shade_gesture(axes, int(dataset.gesture_start[i]), int(dataset.gesture_end[i]), fs)
+    if consistent_scale:
+        _shared_ylim(axes, plotted)
 
     axes[0].set_title(f"raw signal — {tid}")
     axes[-1].set_xlabel("time (s)")
@@ -67,18 +112,40 @@ def plot_raw_signal(
 
 
 def plot_raw_signal_by_class(
-    dataset: Dataset, run_dir: str, class_names: Optional[List[str]] = None
+    dataset: Dataset,
+    run_dir: str,
+    class_names: Optional[List[str]] = None,
+    selection: Optional[Dict[str, List[int]]] = None,
+    consistent_scale: bool = False,
 ) -> List[str]:
-    """Write one raw-signal figure per class present in the dataset.
-
-    Returns the list of file paths written (for artifact logging). Classes with
-    no trials in this dataset are naturally absent (skipped by iterating over
-    the unique labels actually present).
-    """
+    """Write one raw-signal figure per class. When ``selection`` is provided,
+    only its gestures (with their channels) are plotted; otherwise every class
+    with all channels (legacy behavior)."""
     paths: List[str] = []
     if dataset.n_trials == 0:
         return paths
     names = class_names if class_names is not None else dataset.metadata.class_names
+    if selection is not None:
+        present = set(int(l) for l in np.unique(dataset.labels))
+        for g_name, channels in selection.items():
+            try:
+                g_idx = names.index(g_name)
+            except ValueError:
+                continue
+            if g_idx not in present:
+                continue
+            idx = np.where(dataset.labels == g_idx)[0]
+            tid = str(dataset.trial_ids[idx[0]])
+            path = os.path.join(run_dir, f"raw_signal_{g_name}.png")
+            plot_raw_signal(
+                dataset,
+                example_tid=tid,
+                path=path,
+                channels=channels,
+                consistent_scale=consistent_scale,
+            )
+            paths.append(path)
+        return paths
     for cls in np.unique(dataset.labels):
         cls = int(cls)
         idx = np.where(dataset.labels == cls)[0]
