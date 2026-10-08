@@ -67,7 +67,7 @@ def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:
         train_idx = np.where(np.isin(groups, train_g))[0]
         val_idx = np.where(np.isin(groups, val_g))[0]
         test_idx = np.where(np.isin(groups, test_g))[0]
-    elif config.strategy == "random":
+    elif config.strategy in ("random", "trial_wise"):
         perm = rng.permutation(n)
         n_train = int(n * config.train_ratio)
         n_val = int(n * config.val_ratio)

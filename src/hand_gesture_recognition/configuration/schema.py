@@ -113,6 +113,7 @@ class SplitConfig:
             "stratified",
             "subject_wise",
             "session_wise",
+            "trial_wise",
             "predefined",
         ):
             raise ConfigValidationError(f"unknown split strategy: {self.strategy}")
