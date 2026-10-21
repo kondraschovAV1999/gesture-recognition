@@ -188,12 +188,17 @@ class ExperimentRunner:
                 val=drop_no_gesture(split.val, remap, class_names),
                 test=drop_no_gesture(split.test, remap, class_names),
             )
-        split = self._signal_processing(split)
+        if self.cfg.windowing.mode != "two_level":
+            # two-level filters per big window inside the builder instead
+            split = self._signal_processing(split)
         with stage(self.logger, "windowing"):
             windowed = self._window(split)
         with stage(self.logger, "train"):
             if self.cfg.backend == "classical":
-                predictions = self._train_and_predict_classical(windowed)
+                if self.cfg.windowing.mode == "two_level":
+                    predictions = self._train_and_predict_classical_two_level(windowed)
+                else:
+                    predictions = self._train_and_predict_classical(windowed)
             else:
                 predictions = self._train_and_predict_neural(
                     windowed, n_classes=len(class_names)
@@ -300,11 +305,34 @@ class ExperimentRunner:
                 json.dump(run_quality_checks(dataset), f, indent=2)
             plot_class_distribution(dataset, os.path.join(d, "class_distribution.png"))
 
-    def _window(self, split) -> WindowedPartitions:
+    def _window(self, split):
         from hand_gesture_recognition.data.windowing.base import WindowedPartitions
         from hand_gesture_recognition.data.windowing.dispatch import (
             build_windowed_dataset,
         )
+
+        if self.cfg.windowing.mode == "two_level":
+            from hand_gesture_recognition.data.windowing.two_level import (
+                TwoLevelWindowedPartitions,
+                window_dataset_two_level,
+            )
+
+            steps = (
+                [instantiate(s) for s in self.cfg.signal_processing]
+                if self.cfg.signal_processing
+                else []
+            )
+            windowed = TwoLevelWindowedPartitions(
+                train=window_dataset_two_level(split.train, self.cfg.windowing, steps),
+                val=window_dataset_two_level(split.val, self.cfg.windowing, steps),
+                test=window_dataset_two_level(split.test, self.cfg.windowing, steps),
+            )
+            for part in ("train", "val", "test"):
+                if getattr(windowed, part).y.shape[0] == 0:
+                    self.logger.warning(
+                        f"partition '{part}' has 0 big windows after two-level windowing"
+                    )
+            return windowed
 
         windowed = WindowedPartitions(
             train=build_windowed_dataset(
@@ -390,6 +418,22 @@ class ExperimentRunner:
                 duration_s=test_duration,
             ),
         )
+
+    def _train_and_predict_classical_two_level(self, windowed) -> PartitionPredictions:
+        from hand_gesture_recognition.data.windowing.base import (
+            WindowedDataset,
+            WindowedPartitions,
+        )
+
+        def flatten(twd) -> WindowedDataset:
+            return WindowedDataset(X=twd.big_windows, y=twd.y, metadata=twd.metadata)
+
+        flat = WindowedPartitions(
+            train=flatten(windowed.train),
+            val=flatten(windowed.val),
+            test=flatten(windowed.test),
+        )
+        return self._train_and_predict_classical(flat)
 
     def _train_and_predict_neural(
         self, windowed: WindowedPartitions, n_classes: int
