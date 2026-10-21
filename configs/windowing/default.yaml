@@ -1,4 +1,5 @@
 # @package windowing
+mode: single
 window_size_samples: 24
 window_size_seconds: null
 stride_samples: 16

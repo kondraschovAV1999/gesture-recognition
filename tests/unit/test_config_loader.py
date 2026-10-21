@@ -97,3 +97,9 @@ def test_compose_defaults_to_recognition_task():
 def test_compose_loads_classification_task():
     cfg = load_config(mode="compose", overrides=["task=classification"])
     assert cfg.task.name == "classification"
+
+
+def test_compose_loads_two_level_windowing():
+    cfg = load_config(mode="compose", overrides=["windowing=two_level"])
+    assert cfg.windowing.mode == "two_level"
+    assert cfg.windowing.big_window_size_samples is not None

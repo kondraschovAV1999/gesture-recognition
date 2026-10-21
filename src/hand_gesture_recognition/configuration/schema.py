@@ -13,6 +13,7 @@ SUPPORTED_TASKS = ("classification", "recognition")
 
 @dataclass
 class WindowingConfig:
+    mode: str = "single"  # "single" | "two_level"
     window_size_samples: Optional[int] = None
     window_size_seconds: Optional[float] = None
     stride_samples: Optional[int] = None
@@ -20,6 +21,12 @@ class WindowingConfig:
     overlap_percent: Optional[float] = None
     label_granularity: str = "per_window"  # per_window | sequence
     padding: str = "none"  # none | zero
+    # --- big window (used only when mode == "two_level") ---
+    big_window_size_samples: Optional[int] = None
+    big_window_size_seconds: Optional[float] = None
+    big_stride_samples: Optional[int] = None
+    big_stride_seconds: Optional[float] = None
+    big_overlap_percent: Optional[float] = None
 
     def resolve(self, sampling_rate: float) -> Tuple[int, int]:
         """Return (window_size_samples, stride_samples), deriving/validating.
@@ -63,6 +70,48 @@ class WindowingConfig:
                 stride = ws  # non-overlapping default
         if stride < 1:
             raise ConfigValidationError(f"stride must be >= 1, got {stride}")
+        return ws, stride
+
+    def resolve_big(self, sampling_rate: float) -> Tuple[int, int]:
+        """Return (big_window_size_samples, big_stride_samples), mirroring resolve()."""
+        if sampling_rate <= 0:
+            raise ConfigValidationError(
+                f"sampling_rate must be > 0, got {sampling_rate}"
+            )
+        ws = self.big_window_size_samples
+        if self.big_window_size_seconds is not None:
+            derived = round(self.big_window_size_seconds * sampling_rate)
+            if ws is not None and ws != derived:
+                raise ConfigValidationError(
+                    f"big_window_size_samples={ws} != big_window_size_seconds="
+                    f"{self.big_window_size_seconds}s * {sampling_rate}Hz = {derived}"
+                )
+            ws = derived
+        if ws is None:
+            raise ConfigValidationError(
+                "big window size must be given as big_window_size_samples "
+                "or big_window_size_seconds"
+            )
+        if ws < 1:
+            raise ConfigValidationError(
+                f"big_window_size_samples must be >= 1, got {ws}"
+            )
+        stride = self.big_stride_samples
+        if self.big_stride_seconds is not None:
+            derived = round(self.big_stride_seconds * sampling_rate)
+            if stride is not None and stride != derived:
+                raise ConfigValidationError(
+                    f"big_stride_samples={stride} != big_stride_seconds="
+                    f"{self.big_stride_seconds}s * {sampling_rate}Hz = {derived}"
+                )
+            stride = derived
+        if stride is None:
+            if self.big_overlap_percent is not None:
+                stride = round(ws * (1.0 - self.big_overlap_percent / 100.0))
+            else:
+                stride = ws
+        if stride < 1:
+            raise ConfigValidationError(f"big stride must be >= 1, got {stride}")
         return ws, stride
 
 
@@ -349,7 +398,18 @@ def validate_experiment_config(cfg: ExperimentConfig) -> ExperimentConfig:
     cfg.classical.validate()
     cfg.cv.validate()
     # Validate windowing consistency against the configured sampling rate.
-    cfg.windowing.resolve(sampling_rate=cfg.dataset.sampling_rate)
+    if cfg.windowing.mode not in ("single", "two_level"):
+        raise ConfigValidationError(
+            f"windowing.mode={cfg.windowing.mode!r} not in ('single', 'two_level')"
+        )
+    small_size, _ = cfg.windowing.resolve(sampling_rate=cfg.dataset.sampling_rate)
+    if cfg.windowing.mode == "two_level":
+        big_size, _ = cfg.windowing.resolve_big(sampling_rate=cfg.dataset.sampling_rate)
+        if big_size < small_size:
+            raise ConfigValidationError(
+                f"two_level requires big window size ({big_size}) >= "
+                f"small window size ({small_size})"
+            )
     if not cfg.dataset.include_no_gesture and 0 in cfg.evaluation.exclude_classes:
         raise ConfigValidationError(
             "evaluation.exclude_classes=[0] is ambiguous in 5-class mode "

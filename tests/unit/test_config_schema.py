@@ -124,3 +124,36 @@ def test_task_classification_warns_when_include_no_gesture():
     cfg.dataset.include_no_gesture = True
     with pytest.warns(UserWarning):
         validate_experiment_config(cfg)
+
+
+def test_windowing_mode_defaults_single():
+    from hand_gesture_recognition.configuration.schema import WindowingConfig
+
+    assert WindowingConfig().mode == "single"
+
+
+def test_windowing_rejects_bad_mode():
+    cfg = _base_experiment()
+    cfg.windowing.mode = "bogus"
+    with pytest.raises(ConfigValidationError):
+        validate_experiment_config(cfg)
+
+
+def test_two_level_requires_big_at_least_small():
+    cfg = _base_experiment()
+    cfg.windowing.mode = "two_level"
+    cfg.windowing.window_size_samples = 40
+    cfg.windowing.stride_samples = 10
+    cfg.windowing.big_window_size_samples = 20  # < small
+    cfg.windowing.big_stride_samples = 10
+    with pytest.raises(ConfigValidationError):
+        validate_experiment_config(cfg)
+
+
+def test_resolve_big_derives_and_validates():
+    from hand_gesture_recognition.configuration.schema import WindowingConfig
+
+    cfg = WindowingConfig(
+        big_window_size_seconds=0.5, big_stride_seconds=0.1
+    )  # 100 / 20 @ 200 Hz
+    assert cfg.resolve_big(sampling_rate=200.0) == (100, 20)
