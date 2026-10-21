@@ -95,3 +95,11 @@ def test_empty_input_returns_empty():
     twd = window_dataset_two_level(ds, _config(), signal_steps=[])
     assert twd.big_windows.shape[0] == 0
     assert twd.y.shape == (0,)
+
+
+def test_build_windowed_dataset_two_level():
+    from hand_gesture_recognition.data.windowing.dispatch import build_windowed_dataset
+
+    wd = build_windowed_dataset(_dataset(), _config(), "recognition")
+    assert wd.X.shape == (4, 60, 2)
+    assert wd.metadata.window_ids[0] == "s1_t1_big0"

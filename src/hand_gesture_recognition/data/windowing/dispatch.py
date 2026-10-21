@@ -20,6 +20,10 @@ def build_windowed_dataset(
     and the prediction-overlay visualizations, so both re-window the same way the
     training pipeline did.
     """
+    if config.mode == "two_level":
+        from hand_gesture_recognition.data.windowing.two_level import window_big_windows
+
+        return window_big_windows(dataset, config, [])
     if task == "classification":
         return window_gestures(dataset, config)
     return window_dataset(dataset, config)
