@@ -84,3 +84,19 @@ def test_all_rest_trials_returns_empty_dataset():
     wd = window_gestures(ds, WindowingConfig(window_size_samples=25, stride_samples=10))
     assert wd.X.shape == (0, 25, 2)
     assert wd.y.shape == (0,)
+
+
+from hand_gesture_recognition.data.windowing.dispatch import build_windowed_dataset
+
+
+def test_dispatcher_routes_by_task():
+    ds = _dataset()
+    cfg = WindowingConfig(window_size_samples=25, stride_samples=10)
+    cls = build_windowed_dataset(ds, cfg, "classification")
+    rec = build_windowed_dataset(ds, cfg, "recognition")
+    # classification: one window per gesture trial (2), rest dropped
+    assert cls.X.shape[0] == 2
+    assert cls.metadata.window_ids.tolist() == ["s1_t1_gesture", "s1_t2_gesture"]
+    # recognition: sliding windows over all trials (2 + 4 + 1 = 7)
+    assert rec.X.shape[0] == 7
+    assert rec.metadata.window_ids[0].endswith("_window0")
