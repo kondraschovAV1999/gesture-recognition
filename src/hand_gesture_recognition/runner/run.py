@@ -552,7 +552,12 @@ class ExperimentRunner:
             ):
                 p = os.path.join(run_dir, f"predictions_on_signal_{part}.png")
                 plot_predictions_on_signal(
-                    ds, pred, self.cfg.windowing, class_names, path=p
+                    ds,
+                    pred,
+                    self.cfg.windowing,
+                    class_names,
+                    path=p,
+                    task=self.cfg.task.name,
                 )
                 self.tracker.log_artifact(p)
 
@@ -571,6 +576,7 @@ class ExperimentRunner:
                 self.cfg.windowing,
                 class_names,
                 path=p,
+                task=self.cfg.task.name,
             )
             self.tracker.log_artifact(p)
 

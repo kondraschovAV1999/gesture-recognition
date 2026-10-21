@@ -261,3 +261,74 @@ def test_plot_raw_signal_by_class_maps_original_labels(monkeypatch, tmp_path):
         ds, str(tmp_path), class_names=["noGesture", "fist"], selection=selection
     )
     assert captured["tid"] == "s0_t1"  # fist trial, NOT the noGesture trial s0_t0
+
+
+import numpy as np
+
+from hand_gesture_recognition.classical.adapters.sklearn import (
+    SklearnPredictionAdapter,
+)
+from hand_gesture_recognition.data.windowing.gesture import window_gestures
+from hand_gesture_recognition.reporting.visualization import (
+    plot_predictions_on_signal,
+    plot_signal_data_flow,
+)
+
+
+def test_plot_predictions_on_signal_classification_task(tmp_path):
+    ds = make_synthetic_dataset(
+        n_subjects=2,
+        n_trials_per_subject=2,
+        n_classes=2,
+        length=50,
+        n_channels=2,
+        seed=0,
+    )
+    windowing = WindowingConfig(window_size_samples=40, stride_samples=10)
+    wd = window_gestures(ds, windowing)
+    pred = SklearnPredictionAdapter().to_prediction(
+        windowed=wd,
+        y_pred=wd.y.copy(),
+        y_score=None,
+        run_id="test",
+        duration_s=0.0,
+    )
+    path = str(tmp_path / "pred_on_signal.png")
+    fig = plot_predictions_on_signal(
+        ds, pred, windowing, ds.metadata.class_names, path=path, task="classification"
+    )
+    assert fig is not None
+    assert os.path.exists(path)
+
+
+def test_plot_signal_data_flow_classification_task(tmp_path):
+    ds = make_synthetic_dataset(
+        n_subjects=2,
+        n_trials_per_subject=2,
+        n_classes=2,
+        length=50,
+        n_channels=2,
+        seed=0,
+    )
+    windowing = WindowingConfig(window_size_samples=40, stride_samples=10)
+    wd = window_gestures(ds, windowing)
+    pred = SklearnPredictionAdapter().to_prediction(
+        windowed=wd,
+        y_pred=wd.y.copy(),
+        y_score=np.eye(2)[wd.y],
+        run_id="test",
+        duration_s=0.0,
+    )
+    path = str(tmp_path / "data_flow.png")
+    fig = plot_signal_data_flow(
+        ds,
+        ds,
+        ds,
+        pred,
+        windowing,
+        ds.metadata.class_names,
+        path=path,
+        task="classification",
+    )
+    assert fig is not None
+    assert os.path.exists(path)

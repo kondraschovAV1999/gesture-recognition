@@ -14,6 +14,7 @@ from hydra.utils import instantiate
 from hand_gesture_recognition.configuration.schema import VisualizationSelectionConfig
 from hand_gesture_recognition.data.datasets.base import Dataset
 from hand_gesture_recognition.data.windowing.base import window_dataset
+from hand_gesture_recognition.data.windowing.dispatch import build_windowed_dataset
 from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
 from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
 from hand_gesture_recognition.prediction.base import Prediction
@@ -380,13 +381,14 @@ def plot_predictions_on_signal(
     class_names: List[str],
     example_tid: Optional[str] = None,
     path: Optional[str] = None,
+    task: str = "recognition",
 ):
     """One example trial's signal, every channel on its own subplot, with the
     ground-truth gesture segment shaded and per-window predicted labels
     annotated on channel 1 (green = correct, red = wrong)."""
     if dataset.n_trials == 0:
         return None
-    test_wd = window_dataset(dataset, windowing)
+    test_wd = build_windowed_dataset(dataset, windowing, task)
     fs = dataset.metadata.sampling_rate
     ws = test_wd.X.shape[1]
 
@@ -455,6 +457,7 @@ def plot_signal_data_flow(
     class_names: List[str],
     example_tid: Optional[str] = None,
     path: Optional[str] = None,
+    task: str = "recognition",
 ):
     """4-panel data flow: raw ch1, processed ch1, per-window prediction
     probabilities, and expected-vs-predicted labels."""
@@ -471,7 +474,7 @@ def plot_signal_data_flow(
 
     raw_trial = find_trial(raw_dataset, tid)
     proc_trial = find_trial(processed_dataset, tid)
-    test_wd = window_dataset(test_dataset, windowing)
+    test_wd = build_windowed_dataset(test_dataset, windowing, task)
     mask = test_wd.metadata.trial_ids == tid
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
