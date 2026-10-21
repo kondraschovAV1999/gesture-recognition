@@ -200,9 +200,14 @@ class ExperimentRunner:
                 else:
                     predictions = self._train_and_predict_classical(windowed)
             else:
-                predictions = self._train_and_predict_neural(
-                    windowed, n_classes=len(class_names)
-                )
+                if self.cfg.windowing.mode == "two_level":
+                    predictions = self._train_and_predict_neural_two_level(
+                        windowed, n_classes=len(class_names)
+                    )
+                else:
+                    predictions = self._train_and_predict_neural(
+                        windowed, n_classes=len(class_names)
+                    )
         results = {}
         for part in ("train", "val", "test"):
             pred = getattr(predictions, part)
@@ -434,6 +439,103 @@ class ExperimentRunner:
             test=flatten(windowed.test),
         )
         return self._train_and_predict_classical(flat)
+
+    def _compute_n_features(self, feature_specs, windowed) -> int:
+        for part in ("train", "val", "test"):
+            for smalls in getattr(windowed, part).small_windows:
+                if smalls.shape[0] > 0:
+                    parts = []
+                    for spec in feature_specs:
+                        step = instantiate(spec)
+                        parts.append(step.transform(smalls[:1]))
+                    return int(np.concatenate(parts, axis=1).shape[1])
+        return 0
+
+    def _train_and_predict_neural_two_level(
+        self, windowed, n_classes: int
+    ) -> PartitionPredictions:
+        import logging
+
+        import lightning.pytorch as pl
+
+        from hand_gesture_recognition.neural.adapters.lightning import (
+            LightningPredictionAdapter,
+        )
+        from hand_gesture_recognition.neural.datamodules.two_level import (
+            TwoLevelEMGDataModule,
+        )
+
+        logging.getLogger("lightning.pytorch").setLevel(logging.WARNING)
+        logging.getLogger("lightning.fabric").setLevel(logging.WARNING)
+        pl.seed_everything(self.cfg.seed, workers=True)
+
+        feature_specs = self.cfg.classical.resolve_features(
+            self.cfg.dataset.sampling_rate
+        )
+        n_features = self._compute_n_features(feature_specs, windowed)
+        max_small_per_big = max(
+            (
+                len(smalls)
+                for part in ("train", "val", "test")
+                for smalls in getattr(windowed, part).small_windows
+            ),
+            default=1,
+        )
+        dm = TwoLevelEMGDataModule(
+            windowed=windowed,
+            feature_specs=feature_specs,
+            n_features=n_features,
+            max_small_per_big=max_small_per_big,
+            batch_size=self.cfg.neural.datamodule.get("batch_size", 32),
+            num_workers=self.cfg.neural.datamodule.get("num_workers", 0),
+        )
+        # Reuse the configured neural model (LSTM by default) with the feature
+        # dimension as its input_size.
+        model_partial = instantiate(
+            self.cfg.neural.model,
+            n_channels=n_features,
+            n_classes=n_classes,
+            _partial_=True,
+        )
+        model = model_partial(optimizer=self.cfg.neural.optimizer)
+        callbacks = None
+        if self.cfg.neural.early_stopping:
+            callbacks = [instantiate(self.cfg.neural.early_stopping)]
+        trainer_partial = instantiate(self.cfg.neural.trainer, _partial_=True)
+        trainer = trainer_partial(callbacks=callbacks)
+
+        trainer.fit(model, datamodule=dm)
+
+        t0 = time.perf_counter()
+        y_train_pred_raw = trainer.predict(model, dataloaders=dm.train_dataloader())
+        train_duration = time.perf_counter() - t0
+
+        t0 = time.perf_counter()
+        y_val_pred_raw = trainer.predict(model, dataloaders=dm.val_dataloader())
+        val_duration = time.perf_counter() - t0
+
+        t0 = time.perf_counter()
+        y_test_pred_raw = trainer.predict(model, dataloaders=dm.test_dataloader())
+        test_duration = time.perf_counter() - t0
+
+        adapter = LightningPredictionAdapter()
+        return PartitionPredictions(
+            train=adapter.to_prediction(
+                raw_predictions=y_train_pred_raw,
+                run_id=self.cfg.run_id,
+                duration_s=train_duration,
+            ),
+            val=adapter.to_prediction(
+                raw_predictions=y_val_pred_raw,
+                run_id=self.cfg.run_id,
+                duration_s=val_duration,
+            ),
+            test=adapter.to_prediction(
+                raw_predictions=y_test_pred_raw,
+                run_id=self.cfg.run_id,
+                duration_s=test_duration,
+            ),
+        )
 
     def _train_and_predict_neural(
         self, windowed: WindowedPartitions, n_classes: int
