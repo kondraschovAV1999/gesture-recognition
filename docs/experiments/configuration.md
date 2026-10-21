@@ -22,6 +22,7 @@ The current defaults list:
 ```yaml
 defaults:
   - dataset: epn612
+  - task: recognition
   - split: subject_wise
   - windowing: default
   - signal_processing: emg
@@ -55,6 +56,28 @@ defaults:
 | `loader.user_seed` | int | `42` |
 
 `dataset.name=synthetic` loads a fast in-memory fixture (no files on disk).
+
+### `task`
+
+| Field | Values | Default |
+|---|---|---|
+| `name` | `classification` \| `recognition` | `recognition` |
+
+Selects the problem formulation:
+
+- **`recognition`** — the continuous-stream, sliding-window pipeline
+  (`window_dataset`): windows slide over each trial, labeled `0` (rest) or the
+  gesture class. This is the default and matches historical behavior.
+- **`classification`** — the dataset is treated as pre-cut clips with one
+  gesture per trial: `window_gestures` slices `[gesture_start, gesture_end]` into
+  exactly one sample per trial, pad/truncates it to `window_size`, and drops rest
+  trials. In this mode the no-gesture class is always excluded (so
+  `dataset.include_no_gesture` is ignored), and `gesture_crop` is not applied.
+
+```bash
+# classification: one sample per gesture
+python -m hand_gesture_recognition --mode compose task=classification dataset.name=synthetic
+```
 
 ### `split`
 

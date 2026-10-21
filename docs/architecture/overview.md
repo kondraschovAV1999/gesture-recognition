@@ -70,7 +70,12 @@
 2. **Load** — the loader converts a dataset-specific source (e.g. EPN612 JSON) into the framework `Dataset`: a list of continuous, *unwindowed* trials with aligned `labels`, `subject_ids`, `trial_ids`, `gesture_start`/`gesture_end`, per-subject `subject_info` (pandas DataFrame), and `metadata` (sampling rate, channels, class names, content hash).
 3. **Signal processing** (deterministic, before split) — the `signal_processing` config list (e.g. bandpass/notch Butterworth filters, rectification, envelope) transforms the raw continuous signal. These steps learn nothing, so they are safe before splitting.
 4. **Split** — `split_dataset` partitions the processed `Dataset` at the **user/recording level** (random, stratified, subject-wise, session-wise, or predefined). Windows are *never* split across partitions; subject/session leakage is checked for group-based strategies.
-5. **Windowing** — the **single shared** `window_dataset` slides windows over each partition, assigning a per-window label (`0` = rest, `1..5` = gesture) from the gesture bounds. Windows stay in **temporal order** (no window shuffling).
+5. **Windowing** — a single shared sample-builder dispatcher
+   (`build_windowed_dataset`) selects the strategy from `cfg.task.name`:
+   `recognition` slides windows over each partition (assigning per-window labels
+   `0` = rest, `1..N` = gesture from the gesture bounds); `classification` emits
+   one padded/truncated sample per gesture trial (`window_gestures`) and drops
+   rest. Windows stay in **temporal order** (no window shuffling).
 6. **Train + predict** — branches on `cfg.backend`:
    - *classical*: windowing → **learned preprocessing** (fit on train only) → feature extraction → sklearn estimator.
    - *neural*: `seed_everything` → `LightningDataModule` (calls the shared windowing) → `Trainer.fit` → `Trainer.predict`.
@@ -95,3 +100,6 @@ Config mapping: `signal_processing` (deterministic, before split), `preprocessin
 3. **Single configuration entry point** — only `configuration/loader.py` calls Hydra; everything else consumes a typed `ExperimentConfig`.
 4. **Pluggable components via `_target_`** — models, loaders, features, preprocessing, and the trainer are instantiated with `hydra.utils.instantiate`, so adding one is a config entry, not a code change.
 5. **Reproducibility** — dataset content hash (location-independent), explicit seeds, config replay mode.
+6. **`task` toggle** — `classification` (one sample per gesture) vs `recognition`
+   (sliding window) is a first-class config switch; both modes emit the same
+   `WindowedDataset`, so every downstream stage is shared.

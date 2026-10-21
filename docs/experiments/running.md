@@ -47,6 +47,7 @@ For a full reference of every config group and its fields, see
 | `visualization.selection.channels=[1,2]` | which channels to show (1-based) |
 | `reporting.formats=[json,html]` | report formats |
 | `dataset.include_no_gesture=false` | drop the `noGesture`/rest class: 5-class (gesture-only) pipeline |
+| `task=classification` / `task=recognition` | one-sample-per-gesture vs sliding-window pipeline |
 
 ### Examples
 
@@ -70,6 +71,9 @@ python -m hand_gesture_recognition --mode compose \
 # 5-class (no noGesture/rest class): classify only gesture-active windows
 python -m hand_gesture_recognition --mode compose \
   dataset.include_no_gesture=false gesture_crop=none
+
+# Classification: each sample is one whole gesture (rest dropped)
+python -m hand_gesture_recognition --mode compose task=classification dataset.name=synthetic
 ```
 
 ## Python API (running from a script/notebook)
