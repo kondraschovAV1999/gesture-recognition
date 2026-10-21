@@ -28,7 +28,7 @@ def test_classical_classification_smoke(tmp_path, monkeypatch):
 
 def test_neural_classification_smoke(tmp_path, monkeypatch):
     cfg = _classification_cfg(tmp_path, monkeypatch, "neural")
-    cfg.neural.trainer.max_epochs = 1
+    cfg.neural.trainer["max_epochs"] = 1
     runner = ExperimentRunner(cfg)
     result = runner.run()
     assert "accuracy" in result.metrics
