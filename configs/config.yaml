@@ -2,6 +2,7 @@ defaults:
   - dataset: epn612
   - split: subject_wise
   - windowing: default
+  - task: recognition
   - signal_processing: emg
   - gesture_crop: default
   - baseline: none

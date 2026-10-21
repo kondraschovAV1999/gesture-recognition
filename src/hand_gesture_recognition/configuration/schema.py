@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -7,6 +8,7 @@ from hand_gesture_recognition.configuration.errors import ConfigValidationError
 
 SCHEMA_VERSION = "1.0"
 SUPPORTED_BACKENDS = ("classical", "neural")
+SUPPORTED_TASKS = ("classification", "recognition")
 
 
 @dataclass
@@ -297,6 +299,11 @@ class ReportingConfig:
 
 
 @dataclass
+class TaskConfig:
+    name: str = "recognition"  # "classification" | "recognition"
+
+
+@dataclass
 class ExperimentConfig:
     run_id: Optional[str] = None
     backend: str = "classical"
@@ -306,6 +313,7 @@ class ExperimentConfig:
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     split: SplitConfig = field(default_factory=SplitConfig)
     windowing: WindowingConfig = field(default_factory=WindowingConfig)
+    task: TaskConfig = field(default_factory=TaskConfig)
     signal_processing: List[Dict[str, Any]] = field(default_factory=list)
     gesture_crop: GestureCropConfig = field(default_factory=GestureCropConfig)
     baseline: BaselineConfig = field(default_factory=BaselineConfig)
@@ -323,6 +331,17 @@ def validate_experiment_config(cfg: ExperimentConfig) -> ExperimentConfig:
     if cfg.backend not in SUPPORTED_BACKENDS:
         raise ConfigValidationError(
             f"backend={cfg.backend!r} not supported (expected one of {SUPPORTED_BACKENDS})"
+        )
+    if cfg.task.name not in SUPPORTED_TASKS:
+        raise ConfigValidationError(
+            f"task.name={cfg.task.name!r} not in {SUPPORTED_TASKS}"
+        )
+    if cfg.task.name == "classification" and cfg.dataset.include_no_gesture:
+        warnings.warn(
+            "task=classification always excludes the no-gesture class; "
+            "dataset.include_no_gesture is ignored in classification mode.",
+            UserWarning,
+            stacklevel=2,
         )
     if cfg.seed is None:
         raise ConfigValidationError("seed must be set for reproducibility")

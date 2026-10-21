@@ -103,3 +103,24 @@ def test_experiment_config_has_cv_and_visualization():
     cfg = _base_experiment()
     assert cfg.cv.enabled is False
     assert cfg.visualization.enabled is True
+
+
+def test_task_defaults_to_recognition():
+    cfg = _base_experiment()
+    out = validate_experiment_config(cfg)
+    assert out.task.name == "recognition"
+
+
+def test_task_rejects_unknown_value():
+    cfg = _base_experiment()
+    cfg.task.name = "bogus"
+    with pytest.raises(ConfigValidationError):
+        validate_experiment_config(cfg)
+
+
+def test_task_classification_warns_when_include_no_gesture():
+    cfg = _base_experiment()
+    cfg.task.name = "classification"
+    cfg.dataset.include_no_gesture = True
+    with pytest.warns(UserWarning):
+        validate_experiment_config(cfg)

@@ -87,3 +87,13 @@ def test_classical_feature_type_rejects_unknown():
             mode="compose",
             overrides=["classical.feature_type=bogus", "backend=classical"],
         )
+
+
+def test_compose_defaults_to_recognition_task():
+    cfg = load_config(mode="compose")
+    assert cfg.task.name == "recognition"
+
+
+def test_compose_loads_classification_task():
+    cfg = load_config(mode="compose", overrides=["task=classification"])
+    assert cfg.task.name == "classification"
