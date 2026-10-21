@@ -76,6 +76,11 @@
    `0` = rest, `1..N` = gesture from the gesture bounds); `classification` emits
    one padded/truncated sample per gesture trial (`window_gestures`) and drops
    rest. Windows stay in **temporal order** (no window shuffling).
+   When `windowing.mode=two_level`, the shared windowing instead segments each
+   trial into big windows (signal-processed per big window), slides small
+   windows inside each, and labels at the big-window level; classical extracts
+   features on the big window, neural extracts features per small window and
+   feeds the sequence to an LSTM.
 6. **Train + predict** — branches on `cfg.backend`:
    - *classical*: windowing → **learned preprocessing** (fit on train only) → feature extraction → sklearn estimator.
    - *neural*: `seed_everything` → `LightningDataModule` (calls the shared windowing) → `Trainer.fit` → `Trainer.predict`.
@@ -103,3 +108,6 @@ Config mapping: `signal_processing` (deterministic, before split), `preprocessin
 6. **`task` toggle** — `classification` (one sample per gesture) vs `recognition`
    (sliding window) is a first-class config switch; both modes emit the same
    `WindowedDataset`, so every downstream stage is shared.
+7. **Two-level windowing** — `windowing.mode=two_level` adds a coarse big-window
+   level (per-big-window filtering + big-window classification) over the fine
+   small-window level, sharing the same `WindowMetadata`/`evaluate` machinery.

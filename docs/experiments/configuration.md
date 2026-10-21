@@ -129,6 +129,15 @@ python -m hand_gesture_recognition --mode compose cv=kfold cv.group_folds=false
 | `stride_samples` / `stride_seconds` / `overlap_percent` | one of the three | `16` / `null` / `null` |
 | `label_granularity` | `per_window` \| `sequence` | `per_window` |
 | `padding` | `none` \| `zero` | `none` |
+| `mode` | `single` \| `two_level` | `single` |
+| `big_window_size_samples` / `big_window_size_seconds` | one or the other (two_level only) | `null` |
+| `big_stride_samples` / `big_stride_seconds` / `big_overlap_percent` | one of the three (two_level only) | `null` |
+
+`windowing=two_level` enables two-level windowing: the trial is segmented into
+**big windows** (filtered independently), then **small windows** are slid inside
+each big window, and the model classifies at the **big-window** level (classical
+extracts features on the big window; neural extracts features per small window
+and feeds the sequence to an LSTM). Preset: `windowing=two_level`.
 
 ### `signal_processing` (deterministic, before split)
 

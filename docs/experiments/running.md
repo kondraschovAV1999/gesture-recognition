@@ -41,6 +41,7 @@ For a full reference of every config group and its fields, see
 | `neural=dnn` / `lstm` / `cnn` / `cnn_lstm` | choose the neural model (incl. the composite CNN + LSTM) |
 | `neural.trainer.max_epochs=10` | set training epochs |
 | `windowing.window_size_seconds=0.2` `windowing.stride_seconds=0.05` | window size / stride |
+| `windowing=two_level` | two-level windowing: big → small windows, classify at the big-window level |
 | `cv=kfold` / `cv=loso` / `cv=none` | cross-validation (fold mean ± std) or single split |
 | `cv.group_folds=false` | trial-level (non-subject-wise) CV folds |
 | `visualization.selection.gestures=[fist,open]` | which gestures to plot |
@@ -74,6 +75,9 @@ python -m hand_gesture_recognition --mode compose \
 
 # Classification: each sample is one whole gesture (rest dropped)
 python -m hand_gesture_recognition --mode compose task=classification dataset.name=synthetic
+
+# Two-level windowing: big windows filtered, small windows -> LSTM, big-window labels
+python -m hand_gesture_recognition --mode compose windowing=two_level dataset.name=synthetic backend=neural
 ```
 
 ## Python API (running from a script/notebook)
