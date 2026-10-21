@@ -92,6 +92,7 @@ def test_empty_input_returns_empty():
     ds = _dataset()
     ds.gesture_start = np.array([-1, -1])
     ds.gesture_end = np.array([-1, -1])
+    ds.metadata.drop_rest_windows = True
     twd = window_dataset_two_level(ds, _config(), signal_steps=[])
     assert twd.big_windows.shape[0] == 0
     assert twd.y.shape == (0,)
