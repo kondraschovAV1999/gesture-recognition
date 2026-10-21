@@ -64,13 +64,16 @@ class ExperimentRunner:
             with stage(self.logger, "analytics"):
                 self._analytics(raw_dataset)
             with stage(self.logger, "gesture_crop"):
-                cropped = self._gesture_crop(raw_dataset)
+                if cfg.task.name == "recognition":
+                    cropped = self._gesture_crop(raw_dataset)
+                else:
+                    cropped = raw_dataset
 
             # Global class set: no-gesture remap computed once from the FULL
             # dataset so every fold/partition shares the same mapping.
             class_names = cropped.metadata.class_names
             remap = None
-            if not cfg.dataset.include_no_gesture:
+            if self._should_drop_no_gesture():
                 from hand_gesture_recognition.data.class_selection import (
                     build_no_gesture_remap,
                 )
@@ -177,7 +180,7 @@ class ExperimentRunner:
                 val=baseline_remover.transform(split.val),
                 test=baseline_remover.transform(split.test),
             )
-        if not self.cfg.dataset.include_no_gesture:
+        if self._should_drop_no_gesture():
             from hand_gesture_recognition.data.class_selection import drop_no_gesture
 
             split = DataSplit(
@@ -274,6 +277,11 @@ class ExperimentRunner:
 
         return crop_to_gesture(dataset, self.cfg.gesture_crop)
 
+    def _should_drop_no_gesture(self) -> bool:
+        return (not self.cfg.dataset.include_no_gesture) or (
+            self.cfg.task.name == "classification"
+        )
+
     def _analytics(self, dataset) -> None:
         if not self.cfg.analytics.enabled:
             return
@@ -293,15 +301,21 @@ class ExperimentRunner:
             plot_class_distribution(dataset, os.path.join(d, "class_distribution.png"))
 
     def _window(self, split) -> WindowedPartitions:
-        from hand_gesture_recognition.data.windowing.base import (
-            WindowedPartitions,
-            window_dataset,
+        from hand_gesture_recognition.data.windowing.base import WindowedPartitions
+        from hand_gesture_recognition.data.windowing.dispatch import (
+            build_windowed_dataset,
         )
 
         windowed = WindowedPartitions(
-            train=window_dataset(split.train, self.cfg.windowing),
-            val=window_dataset(split.val, self.cfg.windowing),
-            test=window_dataset(split.test, self.cfg.windowing),
+            train=build_windowed_dataset(
+                split.train, self.cfg.windowing, self.cfg.task.name
+            ),
+            val=build_windowed_dataset(
+                split.val, self.cfg.windowing, self.cfg.task.name
+            ),
+            test=build_windowed_dataset(
+                split.test, self.cfg.windowing, self.cfg.task.name
+            ),
         )
         for part in ("train", "val", "test"):
             if getattr(windowed, part).X.shape[0] == 0:
