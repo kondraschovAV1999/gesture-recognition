@@ -540,7 +540,13 @@ def plot_fft_spectrum(
     extracted peak/mean/median frequency marked. Mirrors the logic in
     ``FrequencyDomainFeatures`` (DC removal + Hann + real FFT)."""
     fs = sampling_rate if sampling_rate is not None else dataset.metadata.sampling_rate
-    wd = window_dataset(dataset, windowing)
+    if getattr(windowing, "mode", "single") == "two_level":
+        # Two-level mode filters per big window, so the FFT is over big windows.
+        from hand_gesture_recognition.data.windowing.two_level import window_big_windows
+
+        wd = window_big_windows(dataset, windowing, [])
+    else:
+        wd = window_dataset(dataset, windowing)
     if wd.X.shape[0] == 0:
         return None
     if window_index >= wd.X.shape[0]:
