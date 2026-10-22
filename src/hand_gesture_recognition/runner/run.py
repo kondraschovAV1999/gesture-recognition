@@ -100,7 +100,7 @@ class ExperimentRunner:
                 fold_test_results = []
                 for i, fold in enumerate(folds):
                     with stage(self.logger, f"fold_{i}"):
-                        _, results = self._run_partition(
+                        _, results, _ = self._run_partition(
                             fold, class_names, remap, dataset_name
                         )
                     if results["test"] is not None:
@@ -121,7 +121,7 @@ class ExperimentRunner:
                         "predefined",
                     ):
                         assert_no_group_leakage(split)
-                predictions, results = self._run_partition(
+                predictions, results, split = self._run_partition(
                     split, class_names, remap, dataset_name
                 )
                 result = results["test"]
@@ -169,7 +169,10 @@ class ExperimentRunner:
 
     def _run_partition(self, split, class_names, remap, dataset_name):
         """Run baseline -> class selection -> signal -> window -> train -> evaluate
-        on a single DataSplit. Returns (predictions, {part: result-or-None})."""
+        on a single DataSplit. Returns (predictions, {part: result-or-None},
+        transformed_split) where transformed_split is the post-class-selection /
+        post-signal-processing split used for windowing and prediction (so the
+        prediction-overlay visualizations align with predictions)."""
         baseline_remover = None
         if self.cfg.baseline.enabled:
             from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
@@ -223,7 +226,7 @@ class ExperimentRunner:
                 split_info={"strategy": self.cfg.split.strategy},
                 class_names=class_names,
             )
-        return predictions, results
+        return predictions, results, split
 
     def _report_cv(self, result, fold_results, class_names):
         self.tracker.log_metrics(result.metrics)
