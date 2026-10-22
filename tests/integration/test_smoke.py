@@ -30,7 +30,7 @@ def test_classical_frequency_smoke(tmp_path, monkeypatch):
         overrides=[
             "dataset.name=synthetic",
             "split.strategy=random",
-            "classical.feature_type=frequency_domain",
+            "features.feature_type=frequency_domain",
             "reporting.formats=[json]",
         ],
     )

@@ -369,7 +369,7 @@ class ExperimentRunner:
         # Feature extractors are applied independently to the preprocessed
         # windowed signal and concatenated column-wise (FeatureUnion), so
         # multiple extractors (e.g. time + frequency) compose correctly.
-        feature_specs = self.cfg.classical.resolve_features(
+        feature_specs = self.cfg.features.resolve_features(
             self.cfg.dataset.sampling_rate
         )
         train_parts, val_parts, test_parts = [], [], []
@@ -471,7 +471,7 @@ class ExperimentRunner:
         logging.getLogger("lightning.fabric").setLevel(logging.WARNING)
         pl.seed_everything(self.cfg.seed, workers=True)
 
-        feature_specs = self.cfg.classical.resolve_features(
+        feature_specs = self.cfg.features.resolve_features(
             self.cfg.dataset.sampling_rate
         )
         n_features = self._compute_n_features(feature_specs, windowed)
@@ -728,7 +728,7 @@ class ExperimentRunner:
             )
             self.tracker.log_artifact(p)
 
-        feature_specs = self.cfg.classical.resolve_features(
+        feature_specs = self.cfg.features.resolve_features(
             self.cfg.dataset.sampling_rate
         )
         if any("frequency_domain" in str(f.get("_target_", "")) for f in feature_specs):
