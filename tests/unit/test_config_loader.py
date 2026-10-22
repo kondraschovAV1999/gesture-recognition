@@ -58,39 +58,42 @@ def test_gesture_crop_config_can_be_disabled():
     assert cfg.gesture_crop.enabled is False
 
 
-def test_features_resolves_frequency():
+def test_feature_extraction_resolves_frequency():
     cfg = load_config(
         mode="compose",
-        overrides=["features.feature_type=frequency_domain", "backend=classical"],
+        overrides=[
+            "feature_extraction.feature_type=frequency_domain",
+            "backend=classical",
+        ],
     )
-    specs = cfg.features.resolve_features(cfg.dataset.sampling_rate)
+    specs = cfg.feature_extraction.resolve_features(cfg.dataset.sampling_rate)
     targets = [f["_target_"] for f in specs]
     assert any("FrequencyDomainFeatures" in t for t in targets)
     assert specs[0]["sampling_rate"] == cfg.dataset.sampling_rate
 
 
-def test_features_resolves_combined():
+def test_feature_extraction_resolves_combined():
     cfg = load_config(
         mode="compose",
-        overrides=["features.feature_type=combined", "backend=classical"],
+        overrides=["feature_extraction.feature_type=combined", "backend=classical"],
     )
-    specs = cfg.features.resolve_features(cfg.dataset.sampling_rate)
+    specs = cfg.feature_extraction.resolve_features(cfg.dataset.sampling_rate)
     targets = [f["_target_"] for f in specs]
     assert any("TimeDomainFeatures" in t for t in targets)
     assert any("FrequencyDomainFeatures" in t for t in targets)
 
 
-def test_features_rejects_unknown():
+def test_feature_extraction_rejects_unknown():
     with pytest.raises(ConfigValidationError):
         load_config(
             mode="compose",
-            overrides=["features.feature_type=bogus", "backend=classical"],
+            overrides=["feature_extraction.feature_type=bogus", "backend=classical"],
         )
 
 
-def test_features_defaults_to_time_domain():
+def test_feature_extraction_defaults_to_time_domain():
     cfg = load_config(mode="compose")
-    assert cfg.features.feature_type == "time_domain"
+    assert cfg.feature_extraction.feature_type == "time_domain"
 
 
 def test_compose_defaults_to_recognition_task():

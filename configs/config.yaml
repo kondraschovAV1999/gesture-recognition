@@ -7,7 +7,7 @@ defaults:
   - gesture_crop: default
   - baseline: per_user
   - classical: random_forest
-  - features: default
+  - feature_extraction: default
   - neural: lstm
   - evaluation: basic
   - analytics: basic

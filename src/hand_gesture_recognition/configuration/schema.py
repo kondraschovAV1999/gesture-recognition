@@ -239,7 +239,7 @@ def _frequency_domain_feature(sampling_rate: float) -> Dict[str, Any]:
 
 
 @dataclass
-class FeaturesConfig:
+class FeatureExtractionConfig:
     feature_type: str = (
         "time_domain"  # time_domain | frequency_domain | combined | custom
     )
@@ -263,17 +263,18 @@ class FeaturesConfig:
         if self.feature_type == "combined":
             return [_TIME_DOMAIN_FEATURE, _frequency_domain_feature(sampling_rate)]
         raise ConfigValidationError(
-            f"features.feature_type={self.feature_type!r} not in {_FEATURE_TYPES}"
+            f"feature_extraction.feature_type={self.feature_type!r} not in {_FEATURE_TYPES}"
         )
 
     def validate(self) -> None:
         if self.feature_type not in _FEATURE_TYPES:
             raise ConfigValidationError(
-                f"features.feature_type={self.feature_type!r} not in {_FEATURE_TYPES}"
+                f"feature_extraction.feature_type={self.feature_type!r} not in {_FEATURE_TYPES}"
             )
         if self.feature_type == "custom" and not self.features:
             raise ConfigValidationError(
-                "features.feature_type='custom' requires a non-empty features.features list"
+                "feature_extraction.feature_type='custom' requires a non-empty "
+                "feature_extraction.features list"
             )
 
 
@@ -371,7 +372,9 @@ class ExperimentConfig:
     gesture_crop: GestureCropConfig = field(default_factory=GestureCropConfig)
     baseline: BaselineConfig = field(default_factory=BaselineConfig)
     classical: ClassicalConfig = field(default_factory=ClassicalConfig)
-    features: FeaturesConfig = field(default_factory=FeaturesConfig)
+    feature_extraction: FeatureExtractionConfig = field(
+        default_factory=FeatureExtractionConfig
+    )
     neural: NeuralConfig = field(default_factory=NeuralConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
@@ -413,7 +416,7 @@ def validate_experiment_config(cfg: ExperimentConfig) -> ExperimentConfig:
     if cfg.seed is None:
         raise ConfigValidationError("seed must be set for reproducibility")
     cfg.split.validate()
-    cfg.features.validate()
+    cfg.feature_extraction.validate()
     cfg.cv.validate()
     # Validate windowing consistency against the configured sampling rate.
     if cfg.windowing.mode not in ("single", "two_level"):

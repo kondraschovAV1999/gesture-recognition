@@ -181,17 +181,17 @@ def test_per_user_requires_trial_level_split():
         validate_experiment_config(cfg)
 
 
-def test_features_config_defaults():
-    from hand_gesture_recognition.configuration.schema import FeaturesConfig
+def test_feature_extraction_config_defaults():
+    from hand_gesture_recognition.configuration.schema import FeatureExtractionConfig
 
-    f = FeaturesConfig()
+    f = FeatureExtractionConfig()
     assert f.feature_type == "time_domain"
     assert f.features == []
 
 
-def test_features_validate_rejects_custom_without_features():
-    from hand_gesture_recognition.configuration.schema import FeaturesConfig
+def test_feature_extraction_validate_rejects_custom_without_features():
+    from hand_gesture_recognition.configuration.schema import FeatureExtractionConfig
 
-    f = FeaturesConfig(feature_type="custom")
+    f = FeatureExtractionConfig(feature_type="custom")
     with pytest.raises(ConfigValidationError):
         f.validate()
