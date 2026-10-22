@@ -20,20 +20,19 @@ arg1: value                          # constructor kwargs, passed as-is
 
 ```
 configs/
-├── config.yaml              # the defaults list (which config each group uses)
+├── config.yaml              # defaults list + inlined experiment/task/split
 ├── dataset/                 # dataset loaders
-├── split/                   # split strategies
 ├── cv/                      # cross-validation (none/kfold/loso)
 ├── windowing/               # window size/stride
 ├── signal_processing/       # deterministic signal transforms (before split)
 ├── gesture_crop/            # crop trials to the gesture segment
 ├── baseline/                # global rest-baseline removal
-├── classical/               # classical preprocessing/features/model
+├── feature_extraction/      # handcrafted feature representation
+├── classical/               # classical preprocessing/model
 ├── neural/                  # neural datamodule/optimizer/model/trainer
 ├── evaluation/              # metrics
 ├── analytics/               # analytics flags
-├── visualization/           # plot selection/scale/stage/feature plots
-└── experiment/              # backend, seed, tracking, reporting
+└── visualization/           # plot selection/scale/stage/feature plots
 ```
 
 `config.yaml` picks the default for each group:
@@ -41,13 +40,17 @@ configs/
 ```yaml
 defaults:
   - dataset: epn612
-  - split: subject_wise
   - windowing: default
+  - signal_processing: emg
+  - gesture_crop: default
+  - baseline: none
   - classical: random_forest
-  - neural: dnn
+  - feature_extraction: default
+  - neural: lstm
   - evaluation: basic
   - analytics: basic
-  - experiment: default
+  - cv: none
+  - visualization: default
   - _self_
 ```
 
@@ -85,8 +88,9 @@ Then add `configs/dataset/csv.yaml` and select it with `dataset=csv`.
 
 ## Switching the split strategy
 
-`configs/split/subject_wise.yaml` sets `strategy`. Built-in strategies:
-`random`, `stratified`, `subject_wise`, `session_wise`, `predefined`.
+`split` is now inlined in `config.yaml` (there is no `configs/split/` preset
+group); its `strategy` field defaults to `group_wise`. Built-in strategies:
+`random`, `stratified`, `group_wise`, `session_wise`, `predefined`.
 
 ```bash
 python -m hand_gesture_recognition --mode compose split.strategy=predefined
@@ -114,7 +118,6 @@ channels)` along `axis=-2`) and reference it in the `signal_processing` list.
 
 ```yaml
 # @package classical
-feature_type: time_domain   # time_domain | frequency_domain | combined | custom
 preprocessing:
   - _target_: hand_gesture_recognition.preprocessing.learned.PerChannelStandardScaler
 model:
@@ -124,14 +127,14 @@ model:
 ```
 
 The handcrafted feature representation is chosen with a single `feature_type`
-knob (select from the CLI with `classical.feature_type=<name>`):
+knob (select from the CLI with `feature_extraction.feature_type=<name>`):
 
 | `feature_type` | feature extractors applied |
 |---|---|
 | `time_domain` | `TimeDomainFeatures` |
 | `frequency_domain` | `FrequencyDomainFeatures` (sampling rate auto-injected from the dataset) |
 | `combined` | both, concatenated column-wise |
-| `custom` | an explicit `classical.features:` list of `_target_` entries (for any other extractor) |
+| `custom` | an explicit `feature_extraction.features:` list of `_target_` entries (for any other extractor) |
 
 Swap the model by editing `model._target_` (e.g. to a `SVC` or
 `LogisticRegression` `_target_`), or add a new file under `configs/classical/`
@@ -151,7 +154,7 @@ Built-in extractors:
 - `features/time_domain.py` — `TimeDomainFeatures` (RMS, std, min/max, ...).
 - `features/frequency_domain.py` — `FrequencyDomainFeatures` (total power, peak/
   mean/median frequency per channel). Requires a `sampling_rate` kwarg (injected
-  automatically from `dataset.sampling_rate` by `ClassicalConfig.resolve_features`);
+  automatically from `dataset.sampling_rate` by `FeatureExtractionConfig.resolve_features`);
   it also accepts `use_hann` / `remove_dc` flags.
 
 ## Switching a neural model

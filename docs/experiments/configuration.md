@@ -17,29 +17,52 @@ config or pass overrides on the command line.
   `neural.trainer.max_epochs=10`).
 - Lists use Hydra syntax: `visualization.selection.gestures=[fist,open]`.
 
-The current defaults list:
+The current defaults (plus the inlined top-level fields):
 
 ```yaml
 defaults:
   - dataset: epn612
-  - task: recognition
-  - split: subject_wise
   - windowing: default
   - signal_processing: emg
   - gesture_crop: default
   - baseline: none
   - classical: random_forest
+  - feature_extraction: default
   - neural: lstm
   - evaluation: basic
   - analytics: basic
-  - experiment: default
   - cv: none
   - visualization: default
   - _self_
+
+# experiment (inlined from configs/experiment/default.yaml)
+backend: neural
+seed: 42
+deterministic: true
+tracking:
+  tracking_uri: sqlite:///mlflow.db
+  experiment_name: hand_gesture_recognition
+reporting:
+  formats: [json, html]
+
+# task (inlined from configs/task/*.yaml)
+task:
+  name: recognition
+
+# split (inlined from configs/split/subject_wise.yaml)
+split:
+  strategy: group_wise
+  split_on: subject_ids
+  train_ratio: 0.6
+  val_ratio: 0.2
+  test_ratio: 0.2
+  seed: 42
 ```
 
-`experiment/default.yaml` sets the top-level fields (`backend`, `seed`,
-`deterministic`, `tracking`, `reporting`) via `# @package _global_`.
+The `experiment`, `task`, and `split` groups are **inlined directly in
+`configs/config.yaml`** — there are no separate preset files for them. Set
+their fields on the CLI with `task.name=...`, `split.strategy=...`, and
+`split.split_on=...` (e.g. `task.name=classification`, `split.strategy=group_wise`).
 
 ## Config groups reference
 
@@ -76,21 +99,21 @@ Selects the problem formulation:
 
 ```bash
 # classification: one sample per gesture
-python -m hand_gesture_recognition --mode compose task=classification dataset.name=synthetic
+python -m hand_gesture_recognition --mode compose task.name=classification dataset.name=synthetic
 ```
 
 ### `split`
 
 | Field | Values | Default |
 |---|---|---|
-| `strategy` | `random` \| `stratified` \| `trial_wise` \| `subject_wise` \| `session_wise` \| `predefined` | `subject_wise` |
+| `strategy` | `random` \| `stratified` \| `trial_wise` \| `group_wise` \| `session_wise` \| `predefined` | `group_wise` |
 | `train_ratio` / `val_ratio` / `test_ratio` | sum to `1.0` | `0.6` / `0.2` / `0.2` |
 | `seed` | int | `42` |
 | `split_on` | `subject_ids` \| `trial_ids` | `subject_ids` |
 
 Trial-level strategies (`random`, `stratified`, `trial_wise`) let the same
 subject appear in train and test; subject-wise strategies
-(`subject_wise`, `session_wise`, `predefined`) keep each subject in exactly one
+(`group_wise`, `session_wise`, `predefined`) keep each subject in exactly one
 partition. See [Splitting strategies](splitting.md).
 
 ### `cv` (cross-validation)
@@ -177,14 +200,12 @@ trials, so it only works on real data with a `noGesture` class — not synthetic
 trials (subtracting each trial's own subject's baseline) — requires a
 trial-level split (`random`/`stratified`/`trial_wise`). Preset: `baseline=per_user`.
 
-### `classical`
+### `feature_extraction`
 
 | Field | Values | Default |
 |---|---|---|
 | `feature_type` | `time_domain` \| `frequency_domain` \| `combined` \| `custom` | `time_domain` |
-| `preprocessing` | list of learned transformers (fit on train) | `[PerChannelStandardScaler]` |
 | `features` | explicit `_target_` list (when `feature_type: custom`) | `[]` |
-| `model` | `_target_` + kwargs | `RandomForestEstimator` (`n_estimators: 100`) |
 
 `feature_type` picks the handcrafted feature representation:
 
@@ -193,7 +214,14 @@ trial-level split (`random`/`stratified`/`trial_wise`). Preset: `baseline=per_us
 | `time_domain` | `TimeDomainFeatures` (RMS, std, min, max, mean, max/mean, min/max) |
 | `frequency_domain` | `FrequencyDomainFeatures` (total power, peak/mean/median frequency) |
 | `combined` | both, concatenated column-wise |
-| `custom` | whatever you list in `classical.features` |
+| `custom` | whatever you list in `feature_extraction.features` |
+
+### `classical`
+
+| Field | Values | Default |
+|---|---|---|
+| `preprocessing` | list of learned transformers (fit on train) | `[PerChannelStandardScaler]` |
+| `model` | `_target_` + kwargs | `RandomForestEstimator` (`n_estimators: 100`) |
 
 ### `neural`
 
@@ -222,7 +250,7 @@ Select the architecture with `neural=dnn` / `lstm` / `cnn` / `cnn_lstm`.
 | `enabled` | bool | `true` |
 | `run_qc` | bool (write quality checks + class-distribution plot) | `true` |
 
-### `tracking` and `reporting` (in `experiment/default.yaml`)
+### `tracking` and `reporting` (inlined in `config.yaml`)
 
 | Field | Default |
 |---|---|

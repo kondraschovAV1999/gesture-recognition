@@ -21,7 +21,7 @@ unseen users.
 
 | Strategy | Behavior |
 |---|---|
-| `subject_wise` | Shuffles *subjects* and assigns whole subjects to one partition. |
+| `group_wise` | Shuffles *subjects* and assigns whole subjects to one partition. |
 | `session_wise` | Same grouping mechanism keyed by `split_on` (e.g. session id). |
 | `predefined` | Uses the dataset's own cohort markers (e.g. EPN612 `train:`/`test:` prefixes); test cohort held out entirely. |
 
@@ -31,7 +31,7 @@ which is the honest setting for cross-user generalization. The runner asserts
 
 ## Choosing a strategy
 
-- **Cross-user generalization / realistic deployment** → `subject_wise` (or
+- **Cross-user generalization / realistic deployment** → `group_wise` (or
   `predefined` for EPN612).
 - **Within-user diagnostics / maximum data efficiency** → `random` /
   `stratified` / `trial_wise`.

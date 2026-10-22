@@ -78,7 +78,7 @@ src/hand_gesture_recognition/
 ├── logging_setup/   # centralized logging
 ├── tracing/         # stage-level tracing
 └── runner/          # Experiment Runner orchestration
-configs/             # Hydra config groups (dataset, split, windowing, ...)
+configs/             # Hydra config groups (dataset, windowing, ...)
 tests/               # unit, integration, dataset tests
 docs/                # this documentation
 ```

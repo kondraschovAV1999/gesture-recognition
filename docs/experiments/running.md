@@ -35,9 +35,9 @@ For a full reference of every config group and its fields, see
 |---|---|
 | `dataset.name=synthetic` | use the fast synthetic fixture |
 | `dataset.loader.subjects=[train:user1,train:user2,...]` | load a subset of the real EPN612 data |
-| `split.strategy=subject_wise` / `random` / `trial_wise` / `predefined` | choose the split strategy |
+| `split.strategy=group_wise` / `random` / `trial_wise` / `predefined` | choose the split strategy |
 | `backend=classical` / `neural` | choose the pipeline |
-| `classical.feature_type=time_domain` / `frequency_domain` / `combined` / `custom` | choose the handcrafted feature representation (classical) |
+| `feature_extraction.feature_type=time_domain` / `frequency_domain` / `combined` / `custom` | choose the handcrafted feature representation |
 | `neural=dnn` / `lstm` / `cnn` / `cnn_lstm` | choose the neural model (incl. the composite CNN + LSTM) |
 | `neural.trainer.max_epochs=10` | set training epochs |
 | `windowing.window_size_seconds=0.2` `windowing.stride_seconds=0.05` | window size / stride |
@@ -49,13 +49,13 @@ For a full reference of every config group and its fields, see
 | `reporting.formats=[json,html]` | report formats |
 | `dataset.include_no_gesture=false` | drop the `noGesture`/rest class: 5-class (gesture-only) pipeline |
 | `baseline=per_user` | per-subject rest baseline (trial-level splits only) |
-| `task=classification` / `task=recognition` | one-sample-per-gesture vs sliding-window pipeline |
+| `task.name=classification` / `task.name=recognition` | one-sample-per-gesture vs sliding-window pipeline |
 
 ### Examples
 
 ```bash
-# Classical Random Forest, synthetic, subject-wise split
-python -m hand_gesture_recognition --mode compose dataset.name=synthetic split.strategy=subject_wise
+# Classical Random Forest, synthetic, group-wise split
+python -m hand_gesture_recognition --mode compose dataset.name=synthetic split.strategy=group_wise
 
 # Neural LSTM, synthetic, 3 epochs
 python -m hand_gesture_recognition --mode compose dataset.name=synthetic backend=neural neural=lstm neural.trainer.max_epochs=3
@@ -75,7 +75,7 @@ python -m hand_gesture_recognition --mode compose \
   dataset.include_no_gesture=false gesture_crop=none
 
 # Classification: each sample is one whole gesture (rest dropped)
-python -m hand_gesture_recognition --mode compose task=classification dataset.name=synthetic
+python -m hand_gesture_recognition --mode compose task.name=classification dataset.name=synthetic
 
 # Two-level windowing: big windows filtered, small windows -> LSTM, big-window labels
 python -m hand_gesture_recognition --mode compose windowing=two_level dataset.name=synthetic backend=neural
