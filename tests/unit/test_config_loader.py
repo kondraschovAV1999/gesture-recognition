@@ -102,7 +102,7 @@ def test_compose_defaults_to_recognition_task():
 
 
 def test_compose_loads_classification_task():
-    cfg = load_config(mode="compose", overrides=["task=classification"])
+    cfg = load_config(mode="compose", overrides=["task.name=classification"])
     assert cfg.task.name == "classification"
 
 

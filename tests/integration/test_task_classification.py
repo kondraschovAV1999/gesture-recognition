@@ -8,7 +8,7 @@ def _classification_cfg(tmp_path, monkeypatch, backend):
         overrides=[
             "dataset.name=synthetic",
             "split.strategy=random",
-            "task=classification",
+            "task.name=classification",
             "windowing.window_size_samples=40",
             f"backend={backend}",
             "reporting.formats=[json]",
