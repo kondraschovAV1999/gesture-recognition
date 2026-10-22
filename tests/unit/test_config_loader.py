@@ -106,6 +106,8 @@ def test_compose_loads_two_level_windowing():
 
 
 def test_compose_loads_per_user_baseline():
-    cfg = load_config(mode="compose", overrides=["baseline=per_user"])
+    cfg = load_config(
+        mode="compose", overrides=["baseline=per_user", "split.strategy=trial_wise"]
+    )
     assert cfg.baseline.mode == "per_user"
     assert cfg.baseline.enabled is True

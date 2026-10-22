@@ -33,11 +33,11 @@ def _dataset():
 
 def test_global_mode_unchanged():
     rem = BaselineRemoval(mode="global").fit(_dataset())
-    # global = mean of both rest trials (5 + 9) / 2 = 7 per channel
-    assert np.allclose(rem.baseline_, np.array([7.0, 7.0]))
+    # global = length-weighted mean of rest samples: (30*5 + 20*9) / 50 = 6.6
+    assert np.allclose(rem.baseline_, np.array([6.6, 6.6]))
     out = rem.transform(_dataset())
-    assert np.allclose(out.trials[0], -6.0)  # 1 - 7
-    assert np.allclose(out.trials[2], 2.0)  # 9 - 7
+    assert np.allclose(out.trials[0], -5.6)  # 1 - 6.6
+    assert np.allclose(out.trials[2], 2.4)  # 9 - 6.6
 
 
 def test_per_user_builds_subject_baselines():
