@@ -157,3 +157,25 @@ def test_resolve_big_derives_and_validates():
         big_window_size_seconds=0.5, big_stride_seconds=0.1
     )  # 100 / 20 @ 200 Hz
     assert cfg.resolve_big(sampling_rate=200.0) == (100, 20)
+
+
+def test_baseline_mode_defaults_global():
+    from hand_gesture_recognition.configuration.schema import BaselineConfig
+
+    assert BaselineConfig().mode == "global"
+
+
+def test_baseline_rejects_bad_mode():
+    cfg = _base_experiment()
+    cfg.baseline.mode = "bogus"
+    with pytest.raises(ConfigValidationError):
+        validate_experiment_config(cfg)
+
+
+def test_per_user_requires_trial_level_split():
+    cfg = _base_experiment()
+    cfg.baseline.enabled = True
+    cfg.baseline.mode = "per_user"
+    cfg.split.strategy = "subject_wise"
+    with pytest.raises(ConfigValidationError):
+        validate_experiment_config(cfg)

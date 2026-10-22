@@ -125,6 +125,7 @@ class GestureCropConfig:
 @dataclass
 class BaselineConfig:
     enabled: bool = False
+    mode: str = "global"  # "global" | "per_user"
 
 
 @dataclass
@@ -391,6 +392,19 @@ def validate_experiment_config(cfg: ExperimentConfig) -> ExperimentConfig:
             "dataset.include_no_gesture is ignored in classification mode.",
             UserWarning,
             stacklevel=2,
+        )
+    if cfg.baseline.mode not in ("global", "per_user"):
+        raise ConfigValidationError(
+            f"baseline.mode={cfg.baseline.mode!r} not in ('global', 'per_user')"
+        )
+    if (
+        cfg.baseline.enabled
+        and cfg.baseline.mode == "per_user"
+        and cfg.split.strategy in ("subject_wise", "session_wise", "predefined")
+    ):
+        raise ConfigValidationError(
+            "baseline.mode=per_user requires a trial-level split "
+            "(random/stratified/trial_wise)"
         )
     if cfg.seed is None:
         raise ConfigValidationError("seed must be set for reproducibility")

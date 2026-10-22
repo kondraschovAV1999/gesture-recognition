@@ -103,3 +103,9 @@ def test_compose_loads_two_level_windowing():
     cfg = load_config(mode="compose", overrides=["windowing=two_level"])
     assert cfg.windowing.mode == "two_level"
     assert cfg.windowing.big_window_size_samples is not None
+
+
+def test_compose_loads_per_user_baseline():
+    cfg = load_config(mode="compose", overrides=["baseline=per_user"])
+    assert cfg.baseline.mode == "per_user"
+    assert cfg.baseline.enabled is True
