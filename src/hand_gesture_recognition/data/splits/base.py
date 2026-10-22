@@ -45,7 +45,7 @@ def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:
         # Both strategies split on the group identity given by split_on
         # (subject_ids by default). A true session-wise split needs a
         # session-bearing field; for Phase-1 datasets without one (EPN612 /
-        # synthetic) this behaves like subject_wise. Group counts guarantee
+        # synthetic) this behaves like group_wise. Group counts guarantee
         # >=1 group per partition whenever the dataset has >=3 groups.
         groups = (
             dataset.subject_ids
