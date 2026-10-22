@@ -1,20 +1,40 @@
 defaults:
   - dataset: epn612
-  - split: subject_wise
-  - windowing: two_level
-  - task: recognition
+  - windowing: default
   - signal_processing: emg
   - gesture_crop: default
-  - baseline: per_user
+  - baseline: none
   - classical: random_forest
   - feature_extraction: default
   - neural: lstm
   - evaluation: basic
   - analytics: basic
-  - experiment: default
   - cv: none
   - visualization: default
   - _self_
+
+# experiment (inlined from configs/experiment/default.yaml)
+backend: neural
+seed: 42
+deterministic: true
+tracking:
+  tracking_uri: sqlite:///mlflow.db
+  experiment_name: hand_gesture_recognition
+reporting:
+  formats: [json, html]
+
+# task (inlined from configs/task/*.yaml)
+task:
+  name: recognition
+
+# split (inlined from configs/split/subject_wise.yaml)
+split:
+  strategy: group_wise
+  split_on: subject_ids
+  train_ratio: 0.6
+  val_ratio: 0.2
+  test_ratio: 0.2
+  seed: 42
 
 hydra:
   run:

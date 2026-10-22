@@ -43,7 +43,7 @@ def test_full_classical_pipeline_real_data():
     split = split_dataset(
         ds,
         SplitConfig(
-            strategy="subject_wise",
+            strategy="group_wise",
             train_ratio=0.5,
             val_ratio=0.25,
             test_ratio=0.25,
@@ -85,7 +85,7 @@ def test_full_classical_pipeline_real_data():
         pred,
         EvaluationConfig(metrics=["accuracy", "balanced_accuracy", "macro_f1"]),
         dataset_id=ds.metadata.name,
-        split_info={"strategy": "subject_wise"},
+        split_info={"strategy": "group_wise"},
     )
     assert result.metrics["accuracy"] > 1 / 6
     assert result.metrics["balanced_accuracy"] > 1 / 6

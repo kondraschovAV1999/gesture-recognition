@@ -1,7 +1,0 @@
-# @package split
-strategy: subject_wise
-train_ratio: 0.6
-val_ratio: 0.2
-test_ratio: 0.2
-seed: 42
-split_on: subject_ids

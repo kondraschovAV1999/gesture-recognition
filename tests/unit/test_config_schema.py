@@ -176,7 +176,7 @@ def test_per_user_requires_trial_level_split():
     cfg = _base_experiment()
     cfg.baseline.enabled = True
     cfg.baseline.mode = "per_user"
-    cfg.split.strategy = "subject_wise"
+    cfg.split.strategy = "group_wise"
     with pytest.raises(ConfigValidationError):
         validate_experiment_config(cfg)
 

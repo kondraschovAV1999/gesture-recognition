@@ -116,7 +116,7 @@ class ExperimentRunner:
                 with stage(self.logger, "split"):
                     split = split_dataset(cropped, cfg.split)
                     if cfg.split.strategy in (
-                        "subject_wise",
+                        "group_wise",
                         "session_wise",
                         "predefined",
                     ):

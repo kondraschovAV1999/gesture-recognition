@@ -10,10 +10,10 @@ from hand_gesture_recognition.data.splits.base import (
 )
 
 
-def test_subject_wise_split_has_no_leakage():
+def test_group_wise_split_has_no_leakage():
     ds = make_synthetic_dataset(n_subjects=6, n_trials_per_subject=4, seed=0)
     cfg = SplitConfig(
-        strategy="subject_wise",
+        strategy="group_wise",
         train_ratio=0.5,
         val_ratio=0.25,
         test_ratio=0.25,
@@ -26,10 +26,10 @@ def test_subject_wise_split_has_no_leakage():
     assert total == ds.n_trials
 
 
-def test_subject_wise_split_never_empty_partitions():
+def test_group_wise_split_never_empty_partitions():
     ds = make_synthetic_dataset(n_subjects=3, n_trials_per_subject=3, seed=0)
     cfg = SplitConfig(
-        strategy="subject_wise",
+        strategy="group_wise",
         train_ratio=0.6,
         val_ratio=0.2,
         test_ratio=0.2,

@@ -41,7 +41,7 @@ def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:
     n = dataset.n_trials
     rng = np.random.default_rng(config.seed)
 
-    if config.strategy in ("subject_wise", "session_wise"):
+    if config.strategy in ("group_wise", "session_wise"):
         # Both strategies split on the group identity given by split_on
         # (subject_ids by default). A true session-wise split needs a
         # session-bearing field; for Phase-1 datasets without one (EPN612 /

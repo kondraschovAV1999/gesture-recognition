@@ -144,7 +144,7 @@ class DatasetConfig:
 @dataclass
 class SplitConfig:
     strategy: str = (
-        "subject_wise"  # random | stratified | subject_wise | session_wise | predefined
+        "group_wise"  # random | stratified | group_wise | session_wise | predefined
     )
     train_ratio: float = 0.6
     val_ratio: float = 0.2
@@ -163,7 +163,7 @@ class SplitConfig:
         if self.strategy not in (
             "random",
             "stratified",
-            "subject_wise",
+            "group_wise",
             "session_wise",
             "trial_wise",
             "predefined",
@@ -407,7 +407,7 @@ def validate_experiment_config(cfg: ExperimentConfig) -> ExperimentConfig:
     if (
         cfg.baseline.enabled
         and cfg.baseline.mode == "per_user"
-        and cfg.split.strategy in ("subject_wise", "session_wise", "predefined")
+        and cfg.split.strategy in ("group_wise", "session_wise", "predefined")
     ):
         raise ConfigValidationError(
             "baseline.mode=per_user requires a trial-level split "

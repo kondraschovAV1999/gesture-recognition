@@ -1,9 +1,0 @@
-# @package _global_
-backend: neural
-seed: 42
-deterministic: true
-tracking:
-  tracking_uri: sqlite:///mlflow.db
-  experiment_name: hand_gesture_recognition
-reporting:
-  formats: [json, html]
