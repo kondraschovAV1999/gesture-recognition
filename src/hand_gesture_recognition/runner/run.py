@@ -90,7 +90,7 @@ class ExperimentRunner:
                     BaselineRemoval,
                 )
 
-                viz_baseline = BaselineRemoval().fit(cropped)
+                viz_baseline = BaselineRemoval(mode=self.cfg.baseline.mode).fit(cropped)
 
             if cfg.cv.enabled:
                 from hand_gesture_recognition.data.splits.folds import generate_folds
@@ -174,7 +174,9 @@ class ExperimentRunner:
         if self.cfg.baseline.enabled:
             from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
 
-            baseline_remover = BaselineRemoval().fit(split.train)
+            baseline_remover = BaselineRemoval(mode=self.cfg.baseline.mode).fit(
+                split.train
+            )
             split = DataSplit(
                 train=baseline_remover.transform(split.train),
                 val=baseline_remover.transform(split.val),

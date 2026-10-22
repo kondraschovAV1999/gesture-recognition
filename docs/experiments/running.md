@@ -48,6 +48,7 @@ For a full reference of every config group and its fields, see
 | `visualization.selection.channels=[1,2]` | which channels to show (1-based) |
 | `reporting.formats=[json,html]` | report formats |
 | `dataset.include_no_gesture=false` | drop the `noGesture`/rest class: 5-class (gesture-only) pipeline |
+| `baseline=per_user` | per-subject rest baseline (trial-level splits only) |
 | `task=classification` / `task=recognition` | one-sample-per-gesture vs sliding-window pipeline |
 
 ### Examples

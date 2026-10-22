@@ -166,11 +166,16 @@ applies nothing.
 | Field | Values | Default |
 |---|---|---|
 | `enabled` | bool | `false` (`baseline: none`) |
+| `mode` | `global` \| `per_user` | `global` |
 
 When enabled, a global per-channel rest baseline is estimated from the train
 partition's `noGesture` trials and subtracted before signal processing.
 `baseline=default` enables it; `baseline=none` disables it. (Requires rest
 trials, so it only works on real data with a `noGesture` class — not synthetic.)
+
+`mode=per_user` estimates one baseline per subject from that subject's own rest
+trials (subtracting each trial's own subject's baseline) — requires a
+trial-level split (`random`/`stratified`/`trial_wise`). Preset: `baseline=per_user`.
 
 ### `classical`
 
