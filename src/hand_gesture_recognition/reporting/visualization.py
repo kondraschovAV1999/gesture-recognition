@@ -312,7 +312,14 @@ def plot_feature_over_windows(
         else processed_dataset.metadata.class_names
     )
     present = set(int(l) for l in np.unique(processed_dataset.labels))
-    wd = window_dataset(processed_dataset, windowing)
+    if getattr(windowing, "mode", "single") == "two_level":
+        # Two-level mode filters per big window (small windows are carved from
+        # the filtered big window), so features belong to the big windows.
+        from hand_gesture_recognition.data.windowing.two_level import window_big_windows
+
+        wd = window_big_windows(processed_dataset, windowing, [])
+    else:
+        wd = window_dataset(processed_dataset, windowing)
     if wd.X.shape[0] == 0:
         return paths
     fs = processed_dataset.metadata.sampling_rate
