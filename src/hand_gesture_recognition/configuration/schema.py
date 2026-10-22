@@ -222,7 +222,7 @@ class VisualizationConfig:
     )
 
 
-_CLASSICAL_FEATURE_TYPES = ("time_domain", "frequency_domain", "combined", "custom")
+_FEATURE_TYPES = ("time_domain", "frequency_domain", "combined", "custom")
 
 _TIME_DOMAIN_FEATURE = {
     "_target_": "hand_gesture_recognition.features.time_domain.TimeDomainFeatures",
@@ -239,29 +239,20 @@ def _frequency_domain_feature(sampling_rate: float) -> Dict[str, Any]:
 
 
 @dataclass
-class ClassicalConfig:
-    preprocessing: List[Dict[str, Any]] = field(default_factory=list)
+class FeaturesConfig:
     feature_type: str = (
         "time_domain"  # time_domain | frequency_domain | combined | custom
     )
     # Only used when feature_type == "custom" (an explicit list of _target_ entries).
     features: List[Dict[str, Any]] = field(default_factory=list)
-    model: Dict[str, Any] = field(
-        default_factory=lambda: {
-            "_target_": "hand_gesture_recognition.classical.models.random_forest.RandomForestEstimator",
-            "n_estimators": 100,
-            "random_state": 42,
-        }
-    )
 
     def resolve_features(self, sampling_rate: float) -> List[Dict[str, Any]]:
         """Return the concrete feature-extractor specs for this config.
 
         ``custom`` defers to the explicit ``features`` list; the other presets
         are built here so a single ``feature_type`` knob selects the
-        representation (no per-combination config files needed). The sampling
-        rate is injected from the dataset so the frequency extractor never
-        needs it hardcoded in YAML.
+        representation. The sampling rate is injected from the dataset so the
+        frequency extractor never needs it hardcoded in YAML.
         """
         if self.feature_type == "custom":
             return list(self.features)
@@ -272,18 +263,30 @@ class ClassicalConfig:
         if self.feature_type == "combined":
             return [_TIME_DOMAIN_FEATURE, _frequency_domain_feature(sampling_rate)]
         raise ConfigValidationError(
-            f"classical.feature_type={self.feature_type!r} not in {_CLASSICAL_FEATURE_TYPES}"
+            f"features.feature_type={self.feature_type!r} not in {_FEATURE_TYPES}"
         )
 
     def validate(self) -> None:
-        if self.feature_type not in _CLASSICAL_FEATURE_TYPES:
+        if self.feature_type not in _FEATURE_TYPES:
             raise ConfigValidationError(
-                f"classical.feature_type={self.feature_type!r} not in {_CLASSICAL_FEATURE_TYPES}"
+                f"features.feature_type={self.feature_type!r} not in {_FEATURE_TYPES}"
             )
         if self.feature_type == "custom" and not self.features:
             raise ConfigValidationError(
-                "classical.feature_type='custom' requires a non-empty classical.features list"
+                "features.feature_type='custom' requires a non-empty features.features list"
             )
+
+
+@dataclass
+class ClassicalConfig:
+    preprocessing: List[Dict[str, Any]] = field(default_factory=list)
+    model: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "_target_": "hand_gesture_recognition.classical.models.random_forest.RandomForestEstimator",
+            "n_estimators": 100,
+            "random_state": 42,
+        }
+    )
 
 
 @dataclass
@@ -368,6 +371,7 @@ class ExperimentConfig:
     gesture_crop: GestureCropConfig = field(default_factory=GestureCropConfig)
     baseline: BaselineConfig = field(default_factory=BaselineConfig)
     classical: ClassicalConfig = field(default_factory=ClassicalConfig)
+    features: FeaturesConfig = field(default_factory=FeaturesConfig)
     neural: NeuralConfig = field(default_factory=NeuralConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
@@ -409,7 +413,7 @@ def validate_experiment_config(cfg: ExperimentConfig) -> ExperimentConfig:
     if cfg.seed is None:
         raise ConfigValidationError("seed must be set for reproducibility")
     cfg.split.validate()
-    cfg.classical.validate()
+    cfg.features.validate()
     cfg.cv.validate()
     # Validate windowing consistency against the configured sampling rate.
     if cfg.windowing.mode not in ("single", "two_level"):

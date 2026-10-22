@@ -1,5 +1,4 @@
 # @package classical
-feature_type: time_domain   # time_domain | frequency_domain | combined | custom
 preprocessing:
   - _target_: hand_gesture_recognition.preprocessing.learned.PerChannelStandardScaler
 model:
