@@ -1,53 +1,51 @@
 import numpy as np
 
-from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
-from hand_gesture_recognition.data.hashing import hash_files, hash_directory
+from hand_gesture_recognition.data.datasets.base import (
+    Dataset,
+    DatasetMetadata,
+    Trial,
+    User,
+)
 
 
-def _meta() -> DatasetMetadata:
+def _meta():
     return DatasetMetadata(
-        name="test",
-        version="1",
+        name="x",
+        version="0",
         sampling_rate=200.0,
-        channels=["ch1", "ch2"],
-        class_names=["a", "b"],
+        channels=["c1", "c2"],
+        class_names=["noGesture", "fist", "open"],
         content_hash="h",
-        provenance={},
     )
 
 
-def test_dataset_n_trials_and_shapes():
-    d = Dataset(
-        trials=[np.zeros((100, 2)), np.ones((100, 2))],
-        labels=np.array([0, 1]),
-        subject_ids=np.array(["s1", "s1"]),
-        trial_ids=np.array(["t1", "t2"]),
-        gesture_start=np.array([0, 0]),
-        gesture_end=np.array([100, 100]),
-        metadata=_meta(),
+def test_trial_is_rest():
+    rest = Trial("t1", "u1", "noGesture", -1, -1, np.zeros((10, 2), np.float32))
+    gesture = Trial("t2", "u1", "fist", 0, 10, np.zeros((10, 2), np.float32))
+    assert rest.is_rest is True
+    assert gesture.is_rest is False
+
+
+def test_dataset_flatten_and_derived_labels():
+    u = User(
+        "u1",
+        [
+            Trial("u1:t1", "u1", "fist", 0, 10, np.zeros((10, 2), np.float32)),
+            Trial("u1:t2", "u1", "noGesture", -1, -1, np.zeros((10, 2), np.float32)),
+            Trial("u1:t3", "u1", "open", 0, 10, np.zeros((10, 2), np.float32)),
+        ],
     )
-    assert d.n_trials == 2
-    assert d.trials[0].shape == (100, 2)
-    assert d.labels.tolist() == [0, 1]
+    ds = Dataset(_meta(), [u])
+    assert ds.n_trials == 3
+    assert [t.trial_id for t in ds.trials] == ["u1:t1", "u1:t2", "u1:t3"]
+    # labels derived from class_names ordering: fist=1, noGesture=0, open=2
+    assert ds.labels.tolist() == [1, 0, 2]
+    assert ds.subject_ids.tolist() == ["u1", "u1", "u1"]
+    assert ds.trial_ids.tolist() == ["u1:t1", "u1:t2", "u1:t3"]
 
 
-def test_hash_files_is_order_independent(tmp_path):
-    a = tmp_path / "a.txt"
-    b = tmp_path / "b.txt"
-    a.write_text("hello")
-    b.write_text("world")
-    h1 = hash_files([str(a), str(b)])
-    h2 = hash_files([str(b), str(a)])
-    assert h1 == h2
-    assert len(h1) == 64
-
-
-def test_hash_directory_is_location_independent(tmp_path):
-    dir1 = tmp_path / "d1"
-    dir2 = tmp_path / "d2"
-    dir1.mkdir()
-    dir2.mkdir()
-    for d in (dir1, dir2):
-        (d / "a.txt").write_text("1")
-        (d / "b.txt").write_text("2")
-    assert hash_directory(str(dir1)) == hash_directory(str(dir2))
+def test_dataset_trials_cache_respects_replace():
+    u = User("u1", [Trial("u1:t1", "u1", "fist", 0, 10, np.zeros((10, 2), np.float32))])
+    ds = Dataset(_meta(), [u])
+    first = ds.trials
+    assert ds.trials is first  # cached

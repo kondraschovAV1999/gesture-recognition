@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-import pandas as pd
 
 
 @dataclass
@@ -16,27 +16,57 @@ class DatasetMetadata:
     class_names: List[str]
     content_hash: str
     provenance: Dict[str, Any] = field(default_factory=dict)
-    drop_rest_windows: bool = False  # windowing drops (not labels) rest windows
+    no_gesture_name: str = "noGesture"
+
+
+@dataclass
+class Trial:
+    trial_id: str
+    user_id: str
+    gesture_name: str
+    start: int
+    end: int
+    emg: np.ndarray  # (time_steps, channels)
+
+    @property
+    def is_rest(self) -> bool:
+        return self.start < 0
+
+
+@dataclass
+class User:
+    user_id: str
+    trials: List[Trial]
+    demographics: Optional[Dict[str, Any]] = None
 
 
 @dataclass
 class Dataset:
-    """Raw, unwindowed dataset: one trial = one continuous signal.
+    """Nested dataset: users own trials; trials own the raw EMG signal.
 
-    trials[i] has shape (time_steps, channels) and may vary in length across i.
-    labels, subject_ids, trial_ids, gesture_start, gesture_end are aligned with
-    trials. gesture_start/gesture_end are EMG sample indices delimiting the
-    gesture segment within the trial; both are -1 for rest (no-gesture) trials.
+    ``trials``/``labels``/``subject_ids``/``trial_ids`` are derived, cached
+    flat views. Treat instances as immutable (transform via ``replace``).
     """
 
-    trials: List[np.ndarray]
-    labels: np.ndarray
-    subject_ids: np.ndarray
-    trial_ids: np.ndarray
-    gesture_start: np.ndarray
-    gesture_end: np.ndarray
     metadata: DatasetMetadata
-    subject_info: Optional[pd.DataFrame] = None  # index=subject_id, cols=demographics
+    users: List[User]
+
+    @cached_property
+    def trials(self) -> List[Trial]:
+        return [t for u in self.users for t in u.trials]
+
+    @cached_property
+    def labels(self) -> np.ndarray:
+        lut = {n: i for i, n in enumerate(self.metadata.class_names)}
+        return np.asarray([lut[t.gesture_name] for t in self.trials], dtype=int)
+
+    @cached_property
+    def subject_ids(self) -> np.ndarray:
+        return np.asarray([t.user_id for t in self.trials])
+
+    @cached_property
+    def trial_ids(self) -> np.ndarray:
+        return np.asarray([t.trial_id for t in self.trials])
 
     @property
     def n_trials(self) -> int:
