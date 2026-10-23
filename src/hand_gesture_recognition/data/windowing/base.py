@@ -80,13 +80,18 @@ def window_emg(
                 np.array([], int),
                 _empty_meta(),
             )
-    g_start, g_end = rest_bounds if rest_bounds is not None else (-1, -1)
+    g_start = g_end = None
+    if rest_bounds is not None:
+        g_start, g_end = rest_bounds
     n = (length - ws) // stride + 1
     xs, ys, starts, ends = [], [], [], []
     for i in range(n):
         s = i * stride
         e = s + ws
-        is_rest = (g_start < 0) or (e <= g_start) or (s >= g_end)
+        if rest_bounds is None:
+            is_rest = False
+        else:
+            is_rest = (g_start < 0) or (e <= g_start) or (s >= g_end)
         if drop_rest and is_rest:
             continue
         xs.append(emg[s:e])
