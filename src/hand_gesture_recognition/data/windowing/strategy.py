@@ -118,7 +118,7 @@ class TwoLevelWindowing:
                     drop_rest=False,
                 )
                 smalls.append(sX)
-                big_ids.append(f"{t.trial_id}_big{j}")
+                big_ids.append(m.window_ids[j])
                 big_X.append(big)
                 big_y.append(int(y[j]))
                 # per-big-window metadata: take the j-th row of m
