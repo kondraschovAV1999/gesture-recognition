@@ -1,21 +1,28 @@
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import WindowingConfig
-from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
+from hand_gesture_recognition.data.datasets.base import (
+    Dataset,
+    DatasetMetadata,
+    Trial,
+    User,
+)
 from hand_gesture_recognition.data.windowing.base import window_dataset
 
 
 def _ds(lengths=(100, 100)):
     trials = [
-        np.arange(l, dtype=np.float32)[:, None].repeat(2, axis=1) for l in lengths
+        Trial(
+            f"t{i + 1}",
+            f"s{i + 1}",
+            "a" if i == 0 else "b",
+            0,
+            l,
+            np.arange(l, dtype=np.float32)[:, None].repeat(2, axis=1),
+        )
+        for i, l in enumerate(lengths)
     ]
     return Dataset(
-        trials=trials,
-        labels=np.array([0, 1]),
-        subject_ids=np.array(["s1", "s2"]),
-        trial_ids=np.array(["t1", "t2"]),
-        gesture_start=np.zeros(2, dtype=int),
-        gesture_end=np.array([t.shape[0] for t in trials], dtype=int),
         metadata=DatasetMetadata(
             name="x",
             version="0",
@@ -24,6 +31,7 @@ def _ds(lengths=(100, 100)):
             class_names=["a", "b"],
             content_hash="h",
         ),
+        users=[User(t.user_id, [t]) for t in trials],
     )
 
 

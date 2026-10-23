@@ -1,33 +1,69 @@
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import WindowingConfig
-from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
+from hand_gesture_recognition.data.datasets.base import (
+    Dataset,
+    DatasetMetadata,
+    Trial,
+    User,
+)
 from hand_gesture_recognition.data.windowing.gesture import window_gestures
 
 
+def _metadata():
+    return DatasetMetadata(
+        name="x",
+        version="0",
+        sampling_rate=200.0,
+        channels=["c1", "c2"],
+        class_names=["noGesture", "fist", "waveIn"],
+        content_hash="h",
+    )
+
+
+def _trial(tid, uid, gesture, start, end, n):
+    return Trial(
+        tid,
+        uid,
+        gesture,
+        start,
+        end,
+        np.arange(n, dtype=np.float32)[:, None].repeat(2, axis=1),
+    )
+
+
 def _dataset():
-    # trial 0: gesture [10,30] in a 40-sample trial (label 1)
-    # trial 1: gesture [0,60] in a 60-sample trial (label 2)
-    # trial 2: rest (label 0)
+    # user s1: gesture trial t1 [10,30] in 40 samples (label "fist" -> 1),
+    #          gesture trial t2 [0,60] in 60 samples (label "waveIn" -> 2)
+    # user s2: rest trial t3 ("noGesture" -> 0), dropped in classification
     return Dataset(
-        trials=[
-            np.arange(40, dtype=np.float32)[:, None].repeat(2, axis=1),
-            np.arange(60, dtype=np.float32)[:, None].repeat(2, axis=1),
-            np.arange(30, dtype=np.float32)[:, None].repeat(2, axis=1),
+        metadata=_metadata(),
+        users=[
+            User(
+                "s1",
+                [
+                    _trial("t1", "s1", "fist", 10, 30, 40),
+                    _trial("t2", "s1", "waveIn", 0, 60, 60),
+                ],
+            ),
+            User("s2", [_trial("t3", "s2", "noGesture", -1, -1, 30)]),
         ],
-        labels=np.array([1, 2, 0]),
-        subject_ids=np.array(["s1", "s1", "s2"]),
-        trial_ids=np.array(["t1", "t2", "t3"]),
-        gesture_start=np.array([10, 0, -1]),
-        gesture_end=np.array([30, 60, -1]),
-        metadata=DatasetMetadata(
-            name="x",
-            version="0",
-            sampling_rate=200.0,
-            channels=["c1", "c2"],
-            class_names=["rest", "fist", "waveIn"],
-            content_hash="h",
-        ),
+    )
+
+
+def _all_rest_dataset():
+    return Dataset(
+        metadata=_metadata(),
+        users=[
+            User(
+                "s1",
+                [
+                    _trial("t1", "s1", "noGesture", -1, -1, 40),
+                    _trial("t2", "s1", "noGesture", -1, -1, 60),
+                    _trial("t3", "s2", "noGesture", -1, -1, 30),
+                ],
+            ),
+        ],
     )
 
 
@@ -43,7 +79,7 @@ def test_one_sample_per_gesture_trial():
 
 
 def test_short_gesture_is_zero_padded():
-    # trial 0 gesture [10,30] = 20 samples < ws 25 -> padded to 25
+    # trial t1 gesture [10,30] = 20 samples < ws 25 -> padded to 25
     wd = window_gestures(
         _dataset(), WindowingConfig(window_size_samples=25, stride_samples=10)
     )
@@ -52,12 +88,12 @@ def test_short_gesture_is_zero_padded():
 
 
 def test_long_gesture_is_truncated():
-    # trial 1 gesture [0,60] = 60 samples > ws 25 -> truncated to first 25
+    # trial t2 gesture [0,60] = 60 samples > ws 25 -> truncated to first 25
     wd = window_gestures(
         _dataset(), WindowingConfig(window_size_samples=25, stride_samples=10)
     )
     assert wd.X[1].shape[0] == 25
-    assert np.array_equal(wd.X[1], _dataset().trials[1][:25])
+    assert np.array_equal(wd.X[1], _dataset().trials[1].emg[:25])
 
 
 def test_exact_length_gesture_unchanged():
@@ -65,7 +101,7 @@ def test_exact_length_gesture_unchanged():
         _dataset(), WindowingConfig(window_size_samples=60, stride_samples=10)
     )
     assert wd.X[1].shape[0] == 60
-    assert np.array_equal(wd.X[1], _dataset().trials[1])
+    assert np.array_equal(wd.X[1], _dataset().trials[1].emg)
 
 
 def test_metadata_carries_gesture_bounds_and_ids():
@@ -78,10 +114,9 @@ def test_metadata_carries_gesture_bounds_and_ids():
 
 
 def test_all_rest_trials_returns_empty_dataset():
-    ds = _dataset()
-    ds.gesture_start = np.array([-1, -1, -1])
-    ds.gesture_end = np.array([-1, -1, -1])
-    wd = window_gestures(ds, WindowingConfig(window_size_samples=25, stride_samples=10))
+    wd = window_gestures(
+        _all_rest_dataset(), WindowingConfig(window_size_samples=25, stride_samples=10)
+    )
     assert wd.X.shape == (0, 25, 2)
     assert wd.y.shape == (0,)
 

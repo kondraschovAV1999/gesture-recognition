@@ -108,3 +108,4 @@ def test_window_dataset_matches_flat_behavior():
         "t2",
     ]
     assert wd.metadata.window_start.tolist() == [0, 2, 4, 6, 0, 2, 4, 6]
+    assert wd.metadata.window_ids[0] == "s1_t1_window0"

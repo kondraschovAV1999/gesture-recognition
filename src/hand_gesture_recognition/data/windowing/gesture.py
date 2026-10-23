@@ -9,70 +9,61 @@ from hand_gesture_recognition.data.datasets.base import Dataset
 from hand_gesture_recognition.data.windowing.base import (
     WindowedDataset,
     WindowMetadata,
+    _concat_meta,
 )
 
 
 def window_gestures(dataset: Dataset, config: WindowingConfig) -> WindowedDataset:
     """Build one sample per gesture trial (classification formulation).
 
-    Each gesture trial (``gesture_start >= 0``) contributes exactly one window:
-    the segment ``trial[gesture_start:gesture_end]`` (the whole gesture, no
-    context margin), zero-padded at the end if shorter than the window size and
-    truncated to the first ``window_size`` samples if longer. Rest trials
-    (``gesture_start < 0``) are dropped entirely. Returns the same
-    ``WindowedDataset`` shape as ``window_dataset`` so all downstream stages
-    (classical/neural backends, evaluation, reporting) are unchanged.
+    Each non-rest trial (``is_rest`` false) contributes exactly one window: the
+    segment ``trial.emg[trial.start:trial.end]`` (the whole gesture, no context
+    margin), zero-padded at the end if shorter than the window size and
+    truncated to the first ``ws`` samples if longer. Rest trials are dropped
+    entirely. Returns the same ``WindowedDataset`` shape as ``window_dataset``
+    so all downstream stages (classical/neural backends, evaluation, reporting)
+    are unchanged.
     """
     ws, _ = config.resolve(sampling_rate=dataset.metadata.sampling_rate)
-    n_channels = (
-        len(dataset.metadata.channels)
-        if dataset.metadata.channels
-        else (dataset.trials[0].shape[1] if dataset.trials else 0)
-    )
     xs: List[np.ndarray] = []
     ys: List[int] = []
-    starts: List[int] = []
-    ends: List[int] = []
-    subjects: List[str] = []
-    trials: List[str] = []
-    wins: List[str] = []
+    metas: List[WindowMetadata] = []
 
-    for trial, label, subj, tid, g_start, g_end in zip(
-        dataset.trials,
-        dataset.labels,
-        dataset.subject_ids,
-        dataset.trial_ids,
-        dataset.gesture_start,
-        dataset.gesture_end,
-    ):
-        g_start = int(g_start)
-        g_end = int(g_end)
-        if g_start < 0:
+    for t in dataset.trials:
+        if t.is_rest:
             continue  # rest trial: dropped in classification mode
-        seg = trial[g_start:g_end]
+        seg = t.emg[t.start : t.end]
         if seg.shape[0] < ws:
             pad = np.zeros((ws - seg.shape[0], seg.shape[1]), dtype=seg.dtype)
             seg = np.vstack([seg, pad])
         elif seg.shape[0] > ws:
             seg = seg[:ws]
         xs.append(seg)
-        ys.append(int(label))
-        starts.append(g_start)
-        ends.append(g_end)
-        subjects.append(str(subj))
-        trials.append(str(tid))
-        wins.append(f"{subj}_{tid}_gesture")
+        ys.append(dataset.metadata.class_names.index(t.gesture_name))
+        metas.append(
+            WindowMetadata(
+                window_start=np.asarray([t.start], int),
+                window_end=np.asarray([t.end], int),
+                subject_ids=np.asarray([t.user_id]),
+                trial_ids=np.asarray([t.trial_id]),
+                window_ids=np.asarray([f"{t.user_id}_{t.trial_id}_gesture"]),
+            )
+        )
+
+    if not xs:
+        n_ch = (
+            len(dataset.metadata.channels)
+            if dataset.metadata.channels
+            else (dataset.trials[0].emg.shape[1] if dataset.trials else 0)
+        )
+        return WindowedDataset(
+            X=np.zeros((0, ws, n_ch), dtype=np.float32),
+            y=np.asarray([], dtype=int),
+            metadata=_concat_meta([]),
+        )
 
     return WindowedDataset(
-        X=np.stack(xs, axis=0)
-        if xs
-        else np.zeros((0, ws, n_channels), dtype=np.float32),
+        X=np.stack(xs, axis=0),
         y=np.asarray(ys, dtype=int),
-        metadata=WindowMetadata(
-            window_start=np.asarray(starts, dtype=int),
-            window_end=np.asarray(ends, dtype=int),
-            subject_ids=np.asarray(subjects),
-            trial_ids=np.asarray(trials),
-            window_ids=np.asarray(wins),
-        ),
+        metadata=_concat_meta(metas),
     )
