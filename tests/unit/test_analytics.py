@@ -2,7 +2,7 @@ import numpy as np
 
 from hand_gesture_recognition.analytics.qc import run_quality_checks
 from hand_gesture_recognition.analytics.stats import dataset_summary
-from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
+from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata, Trial
 
 
 def _ds():
@@ -14,15 +14,25 @@ def _ds():
         class_names=["a", "b"],
         content_hash="h",
     )
-    return Dataset(
-        trials=[np.ones((100, 2)), np.full((100, 2), np.nan)],
-        labels=np.array([0, 1]),
-        subject_ids=np.array(["s1", "s2"]),
-        trial_ids=np.array(["t1", "t2"]),
-        gesture_start=np.array([0, 0]),
-        gesture_end=np.array([100, 100]),
-        metadata=meta,
-    )
+    trials = [
+        Trial(
+            trial_id="t1",
+            user_id="s1",
+            gesture_name="a",
+            start=0,
+            end=100,
+            emg=np.ones((100, 2)),
+        ),
+        Trial(
+            trial_id="t2",
+            user_id="s2",
+            gesture_name="b",
+            start=0,
+            end=100,
+            emg=np.full((100, 2), np.nan),
+        ),
+    ]
+    return Dataset.from_trials(trials, meta)
 
 
 def test_dataset_summary_counts():

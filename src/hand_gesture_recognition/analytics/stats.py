@@ -11,7 +11,7 @@ from hand_gesture_recognition.data.datasets.base import Dataset
 def dataset_summary(dataset: Dataset) -> Dict[str, Any]:
     label_names = dataset.metadata.class_names
     class_counts = Counter(int(l) for l in dataset.labels)
-    all_signals = np.vstack(dataset.trials)
+    all_signals = np.vstack([t.emg for t in dataset.trials])
     per_channel = {
         ch: {
             "mean": float(all_signals[:, i].mean())

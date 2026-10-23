@@ -10,7 +10,8 @@ from hand_gesture_recognition.data.datasets.base import Dataset
 def run_quality_checks(dataset: Dataset) -> List[Dict[str, Any]]:
     checks: List[Dict[str, Any]] = []
     for i, trial in enumerate(dataset.trials):
-        if np.isnan(trial).any() or np.isinf(trial).any():
+        emg = trial.emg
+        if np.isnan(emg).any() or np.isinf(emg).any():
             checks.append(
                 {
                     "level": "error",
