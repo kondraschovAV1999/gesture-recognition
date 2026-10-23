@@ -89,7 +89,7 @@ def test_epn612_loader_builds_dataset(tmp_path):
         "open",
         "pinch",
     }
-    assert ds.trials[0].shape == (50, 8)
+    assert ds.trials[0].emg.shape == (50, 8)
     assert set(ds.subject_ids.tolist()) == {"train:user1", "train:user2", "test:user3"}
     # trial ids embed the sample section
     assert any(":trainingSamples:" in t for t in ds.trial_ids)
@@ -119,8 +119,8 @@ def test_epn612_loader_extracts_gesture_bounds(tmp_path):
     # trainingSamples (3): noGesture [-1,-1], fist [10,40], open [10,40]
     # testingSamples (3, labeled, no groundTruthIndex): noGesture [-1,-1],
     #   fist [0,50], open [0,50] (fallback startPoint=0 -> end of recording)
-    assert ds.gesture_start.tolist() == [-1, 10, 10, -1, 0, 0]
-    assert ds.gesture_end.tolist() == [-1, 40, 40, -1, 50, 50]
+    assert [t.start for t in ds.trials] == [-1, 10, 10, -1, 0, 0]
+    assert [t.end for t in ds.trials] == [-1, 40, 40, -1, 50, 50]
 
 
 def test_epn612_loader_extracts_subject_info(tmp_path):
@@ -128,14 +128,13 @@ def test_epn612_loader_extracts_subject_info(tmp_path):
     _write_user(tmp_path, "testingJSON", 2)
     ds = EPN612Loader().load(str(tmp_path))
 
-    info = ds.subject_info
-    assert info is not None
-    assert set(info.index) == {"train:user1", "test:user2"}
-    assert info.loc["train:user1", "age"] == 21  # 20 + user_id
-    assert info.loc["test:user2", "age"] == 22
-    assert info.loc["train:user1", "gender"] in ("man", "woman")
-    assert info.loc["train:user1", "handedness"] == "right"
-    assert info.loc["train:user1", "arm_damage"] == False  # noqa: E712 (numpy bool)
+    by_id = {u.user_id: u.demographics for u in ds.users}
+    assert set(by_id) == {"train:user1", "test:user2"}
+    assert by_id["train:user1"]["age"] == 21  # 20 + user_id
+    assert by_id["test:user2"]["age"] == 22
+    assert by_id["train:user1"]["gender"] in ("man", "woman")
+    assert by_id["train:user1"]["handedness"] == "right"
+    assert by_id["train:user1"]["arm_damage"] is False
 
 
 def test_epn612_loader_skips_unlabeled_testing_samples(tmp_path):
@@ -181,3 +180,36 @@ def test_epn612_loader_subjects_precedence_over_max_users(tmp_path):
         str(tmp_path)
     )
     assert set(ds.subject_ids.tolist()) == {"train:user1"}
+
+
+def _write_nested_user(path, cohort="training", user="user1"):
+    import os
+
+    d = os.path.join(path, cohort, user)
+    os.makedirs(d, exist_ok=True)
+    doc = {
+        "generalInfo": {"samplingFrequencyInHertz": 200.0},
+        "userInfo": {"age": 30},
+        "trainingSamples": {
+            "s1": {
+                "emg": {"ch1": [1, 2, 3], "ch2": [1, 2, 3]},
+                "gestureName": "fist",
+                "groundTruthIndex": [0, 3],
+            },
+        },
+    }
+    with open(os.path.join(d, f"{user}.json"), "w") as f:
+        json.dump(doc, f)
+    return d
+
+
+def test_loader_nested(tmp_path):
+    _write_nested_user(tmp_path)
+    ds = EPN612Loader().load(str(tmp_path))
+    assert [u.user_id for u in ds.users] == ["train:user1"]
+    assert ds.users[0].demographics["age"] == 30
+    t = ds.trials[0]
+    assert t.gesture_name == "fist"
+    assert t.emg.shape == (3, 2)
+    assert (t.start, t.end) == (0, 3)
+    assert ds.labels.tolist() == [ds.metadata.class_names.index("fist")]

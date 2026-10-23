@@ -6,9 +6,13 @@ import os
 from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
-import pandas as pd
 
-from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
+from hand_gesture_recognition.data.datasets.base import (
+    Dataset,
+    DatasetMetadata,
+    Trial,
+    User,
+)
 from hand_gesture_recognition.data.hashing import hash_directory_cached
 from hand_gesture_recognition.data.loaders.base import DatasetLoader
 
@@ -42,15 +46,11 @@ class EPN612Loader(DatasetLoader):
             self.max_train_users is not None or self.max_test_users is not None
         ):
             self._sample_users(files, path)
-        trials: List[np.ndarray] = []
-        labels: List[int] = []
-        subject_ids: List[str] = []
-        trial_ids: List[str] = []
+        trials_by_user: Dict[str, List[Trial]] = {}
+        ordered_subject_ids: List[str] = []
         sampling_rate: Optional[float] = None
         label_map: Optional[Dict[str, int]] = None
         class_names: List[str] = list(GESTURE_LABELS.keys())
-        gesture_starts: List[int] = []
-        gesture_ends: List[int] = []
         subject_info_rows: Dict[str, Dict[str, Any]] = {}
 
         for f in files:
@@ -126,26 +126,36 @@ class EPN612Loader(DatasetLoader):
                                 sample.get("startPointforGestureExecution", 0)
                             )
                             g_end = x.shape[0]
-                    trials.append(x)
-                    labels.append(label_map[gesture])
-                    subject_ids.append(subject_id)
-                    trial_ids.append(f"{subject_id}:{section}:{key}")
-                    gesture_starts.append(g_start)
-                    gesture_ends.append(g_end)
+                    if subject_id not in trials_by_user:
+                        trials_by_user[subject_id] = []
+                        ordered_subject_ids.append(subject_id)
+                    trials_by_user[subject_id].append(
+                        Trial(
+                            trial_id=f"{subject_id}:{section}:{key}",
+                            user_id=subject_id,
+                            gesture_name=gesture,
+                            start=g_start,
+                            end=g_end,
+                            emg=x,
+                        )
+                    )
 
-        if not trials:
+        if not trials_by_user:
             raise FileNotFoundError(
                 f"No usable EPN612 trials found under {path} "
                 f"(matched {len(files)} user file(s))"
             )
 
+        users = []
+        for sid in ordered_subject_ids:  # preserve first-seen order
+            users.append(
+                User(
+                    user_id=sid,
+                    trials=trials_by_user[sid],
+                    demographics=subject_info_rows.get(sid),
+                )
+            )
         return Dataset(
-            trials=trials,
-            labels=np.asarray(labels, dtype=int),
-            subject_ids=np.asarray(subject_ids),
-            trial_ids=np.asarray(trial_ids),
-            gesture_start=np.asarray(gesture_starts, dtype=int),
-            gesture_end=np.asarray(gesture_ends, dtype=int),
             metadata=DatasetMetadata(
                 name="epn612",
                 version="2020",
@@ -155,7 +165,7 @@ class EPN612Loader(DatasetLoader):
                 content_hash=hash_directory_cached(path),
                 provenance={"source": "EMG-EPN612", "loader": "EPN612Loader"},
             ),
-            subject_info=pd.DataFrame.from_dict(subject_info_rows, orient="index"),
+            users=users,
         )
 
     def _sample_users(self, files: List[str], path: str) -> None:
