@@ -19,7 +19,7 @@ class DataSplit:
 
 def _subset(dataset: Dataset, idx: np.ndarray) -> Dataset:
     chosen = [dataset.trials[int(i)] for i in idx]
-    return Dataset.from_trials(chosen, dataset.metadata)
+    return dataset.replace_trials(chosen)
 
 
 def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:

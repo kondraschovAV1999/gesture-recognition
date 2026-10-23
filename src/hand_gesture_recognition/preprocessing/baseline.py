@@ -65,7 +65,7 @@ class BaselineRemoval(BaseEstimator):
                 )
                 for t in dataset.trials
             ]
-            return Dataset.from_trials(new_trials, dataset.metadata)
+            return dataset.replace_trials(new_trials)
 
         baselines = cast(Dict[str, np.ndarray], self.baseline_)
         new_trials = []
@@ -79,4 +79,4 @@ class BaselineRemoval(BaseEstimator):
             new_trials.append(
                 replace(t, emg=(t.emg.astype(np.float32) - b).astype(np.float32))
             )
-        return Dataset.from_trials(new_trials, dataset.metadata)
+        return dataset.replace_trials(new_trials)

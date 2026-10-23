@@ -71,3 +71,17 @@ def test_synthetic_dataset_is_nested():
     assert ds.trials[0].emg.shape == (100, 8)
     assert ds.trials[0].gesture_name == "class_0"  # seed 0, s=0,t=0 -> label 0
     assert ds.labels.tolist() == [(s + t) % 3 for s in range(4) for t in range(6)]
+
+
+def test_replace_trials_preserves_demographics():
+    meta = DatasetMetadata("x", "0", 200.0, ["c"], ["noGesture", "fist"], "h")
+    u = User(
+        "u1",
+        [Trial("u1:t1", "u1", "fist", 0, 10, np.zeros((10, 1), np.float32))],
+        demographics={"age": 30},
+    )
+    ds = Dataset(meta, [u])
+    out = ds.replace_trials(
+        [Trial("u1:t2", "u1", "fist", 0, 10, np.zeros((10, 1), np.float32))]
+    )
+    assert out.users[0].demographics == {"age": 30}

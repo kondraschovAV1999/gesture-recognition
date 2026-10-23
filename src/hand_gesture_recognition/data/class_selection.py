@@ -18,7 +18,7 @@ def drop_no_gesture(dataset, remap, new_class_names):
 
     kept = [t for t in dataset.trials if not t.is_rest]
     new_meta = replace(dataset.metadata, class_names=new_class_names)
-    return Dataset(metadata=new_meta, users=Dataset.from_trials(kept, new_meta).users)
+    return dataset.replace_trials(kept, metadata=new_meta)
 
 
 def remove_no_gesture(dataset):

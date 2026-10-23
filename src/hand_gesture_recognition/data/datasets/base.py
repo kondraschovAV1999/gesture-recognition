@@ -52,7 +52,12 @@ class Dataset:
     users: List[User]
 
     @classmethod
-    def from_trials(cls, trials: List[Trial], metadata: DatasetMetadata) -> "Dataset":
+    def from_trials(
+        cls,
+        trials: List[Trial],
+        metadata: DatasetMetadata,
+        demographics: Optional[Dict[str, Optional[Dict[str, Any]]]] = None,
+    ) -> "Dataset":
         by_user: Dict[str, List[Trial]] = {}
         order: List[str] = []
         for t in trials:
@@ -60,7 +65,21 @@ class Dataset:
                 by_user[t.user_id] = []
                 order.append(t.user_id)
             by_user[t.user_id].append(t)
-        return cls(metadata=metadata, users=[User(u, by_user[u]) for u in order])
+        return cls(
+            metadata=metadata,
+            users=[User(u, by_user[u], (demographics or {}).get(u)) for u in order],
+        )
+
+    def replace_trials(
+        self, trials: List[Trial], metadata: Optional[DatasetMetadata] = None
+    ) -> "Dataset":
+        """Rebuild with a new trial list, preserving per-user demographics."""
+        demo = {u.user_id: u.demographics for u in self.users}
+        return Dataset.from_trials(
+            trials,
+            metadata if metadata is not None else self.metadata,
+            demographics=demo,
+        )
 
     @classmethod
     def from_users(cls, users: List[User], metadata: DatasetMetadata) -> "Dataset":

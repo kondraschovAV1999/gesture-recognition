@@ -52,4 +52,4 @@ def crop_to_gesture(dataset: Dataset, config: GestureCropConfig) -> Dataset:
                 )
             )
 
-    return Dataset.from_trials(new_trials, dataset.metadata)
+    return dataset.replace_trials(new_trials)
