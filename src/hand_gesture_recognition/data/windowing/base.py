@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -112,64 +111,38 @@ def window_emg(
 
 def window_dataset(dataset: Dataset, config: WindowingConfig) -> WindowedDataset:
     ws, stride = config.resolve(sampling_rate=dataset.metadata.sampling_rate)
-    drop_rest = dataset.metadata.drop_rest_windows
-    n_channels = (
-        len(dataset.metadata.channels)
-        if dataset.metadata.channels
-        else (dataset.trials[0].shape[1] if dataset.trials else 0)
-    )
-    xs: List[np.ndarray] = []
-    ys: List[int] = []
-    starts: List[int] = []
-    ends: List[int] = []
-    subjects: List[str] = []
-    trials: List[str] = []
-    wins: List[str] = []
-
-    for trial, label, subj, tid, g_start, g_end in zip(
-        dataset.trials,
-        dataset.labels,
-        dataset.subject_ids,
-        dataset.trial_ids,
-        dataset.gesture_start,
-        dataset.gesture_end,
-    ):
-        length = trial.shape[0]
-        if length < ws:
-            if config.padding == "zero":
-                pad = np.zeros((ws - length, trial.shape[1]), dtype=trial.dtype)
-                trial = np.vstack([trial, pad])
-                length = ws
-            else:
-                continue  # drop trials shorter than a window (config.padding == "none")
-        n_windows = (length - ws) // stride + 1
-        for i in range(n_windows):
-            s = i * stride
-            e = s + ws
-            # A window is "rest" if it does not overlap the gesture segment
-            # [g_start, g_end] (or the trial itself is a rest trial, g_start < 0).
-            is_rest = (g_start < 0) or (e <= g_start) or (s >= g_end)
-            if drop_rest and is_rest:
-                continue  # no-gesture class removed: skip rest windows entirely
-            w_label = 0 if is_rest else int(label)
-            xs.append(trial[s:e])
-            ys.append(w_label)
-            starts.append(s)
-            ends.append(e)
-            subjects.append(str(subj))
-            trials.append(str(tid))
-            wins.append(f"{subj}_{tid}_window{i}")
-
+    resolved = replace(config, window_size_samples=ws, stride_samples=stride)
+    drop_rest = getattr(dataset.metadata, "drop_rest_windows", False)
+    Xs, ys, metas = [], [], []
+    for t in dataset.trials:
+        X, y, m = window_emg(
+            t.emg,
+            dataset.metadata.class_names.index(t.gesture_name),
+            resolved,
+            t.user_id,
+            t.trial_id,
+            "window",
+            rest_bounds=(t.start, t.end),  # rest trial -> (-1,-1) -> all rest
+            drop_rest=drop_rest,
+        )
+        if len(y) == 0:
+            continue
+        Xs.append(X)
+        ys.append(y)
+        metas.append(m)
+    if not Xs:
+        n_ch = (
+            len(dataset.metadata.channels)
+            if dataset.metadata.channels
+            else (dataset.trials[0].emg.shape[1] if dataset.trials else 0)
+        )
+        return WindowedDataset(
+            X=np.zeros((0, ws, n_ch), np.float32),
+            y=np.asarray([], int),
+            metadata=_empty_meta(),
+        )
     return WindowedDataset(
-        X=np.stack(xs, axis=0)
-        if xs
-        else np.zeros((0, ws, n_channels), dtype=np.float32),
-        y=np.asarray(ys, dtype=int),
-        metadata=WindowMetadata(
-            window_start=np.asarray(starts, dtype=int),
-            window_end=np.asarray(ends, dtype=int),
-            subject_ids=np.asarray(subjects),
-            trial_ids=np.asarray(trials),
-            window_ids=np.asarray(wins),
-        ),
+        X=np.concatenate(Xs, axis=0),
+        y=np.concatenate(ys, axis=0).astype(int),
+        metadata=_concat_meta(metas),
     )
