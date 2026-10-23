@@ -6,6 +6,7 @@ from hand_gesture_recognition.data.datasets.base import (
     Trial,
     User,
 )
+from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 
 
 def _meta():
@@ -61,3 +62,12 @@ def test_from_trials_groups_by_user():
     assert [u.user_id for u in ds.users] == ["u1", "u2"]
     assert len(ds.users[0].trials) == 2
     assert len(ds.users[1].trials) == 1
+
+
+def test_synthetic_dataset_is_nested():
+    ds = make_synthetic_dataset(seed=0)
+    assert ds.n_trials == 4 * 6
+    assert len(ds.users) == 4
+    assert ds.trials[0].emg.shape == (100, 8)
+    assert ds.trials[0].gesture_name == "class_0"  # seed 0, s=0,t=0 -> label 0
+    assert ds.labels.tolist() == [(s + t) % 3 for s in range(4) for t in range(6)]
