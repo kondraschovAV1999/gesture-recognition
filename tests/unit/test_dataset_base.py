@@ -49,3 +49,15 @@ def test_dataset_trials_cache_respects_replace():
     ds = Dataset(_meta(), [u])
     first = ds.trials
     assert ds.trials is first  # cached
+
+
+def test_from_trials_groups_by_user():
+    trials = [
+        Trial("u1:t1", "u1", "fist", 0, 10, np.zeros((10, 2), np.float32)),
+        Trial("u2:t1", "u2", "fist", 0, 10, np.zeros((10, 2), np.float32)),
+        Trial("u1:t2", "u1", "open", 0, 10, np.zeros((10, 2), np.float32)),
+    ]
+    ds = Dataset.from_trials(trials, _meta())
+    assert [u.user_id for u in ds.users] == ["u1", "u2"]
+    assert len(ds.users[0].trials) == 2
+    assert len(ds.users[1].trials) == 1

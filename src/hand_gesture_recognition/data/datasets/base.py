@@ -51,6 +51,21 @@ class Dataset:
     metadata: DatasetMetadata
     users: List[User]
 
+    @classmethod
+    def from_trials(cls, trials: List[Trial], metadata: DatasetMetadata) -> "Dataset":
+        by_user: Dict[str, List[Trial]] = {}
+        order: List[str] = []
+        for t in trials:
+            if t.user_id not in by_user:
+                by_user[t.user_id] = []
+                order.append(t.user_id)
+            by_user[t.user_id].append(t)
+        return cls(metadata=metadata, users=[User(u, by_user[u]) for u in order])
+
+    @classmethod
+    def from_users(cls, users: List[User], metadata: DatasetMetadata) -> "Dataset":
+        return cls(metadata=metadata, users=list(users))
+
     @cached_property
     def trials(self) -> List[Trial]:
         return [t for u in self.users for t in u.trials]
