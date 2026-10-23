@@ -2,7 +2,11 @@ import numpy as np
 import pytest
 
 from hand_gesture_recognition.configuration.schema import SplitConfig
-from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
+from hand_gesture_recognition.data.datasets.base import (
+    Dataset,
+    DatasetMetadata,
+    Trial,
+)
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.data.splits.base import (
     assert_no_group_leakage,
@@ -83,35 +87,40 @@ def _epn612_like_dataset():
     """Build a dataset mimicking EPN612: a train cohort (train:) with
     trainingSamples + testingSamples, and a test cohort (test:) with
     trainingSamples only."""
-    trials, labels, subjects, tids = [], [], [], []
+    metadata = DatasetMetadata(
+        name="x",
+        version="0",
+        sampling_rate=200.0,
+        channels=[f"ch{i}" for i in range(1, 9)],
+        class_names=["a", "b", "c"],
+        content_hash="h",
+    )
+    trials = []
     for subj in ["train:s1", "train:s2"]:
         for sec in ["trainingSamples", "testingSamples"]:
             for i in range(2):
-                trials.append(np.zeros((100, 8), dtype=np.float32))
-                labels.append(1)
-                subjects.append(subj)
-                tids.append(f"{subj}:{sec}:idx_{i}")
+                trials.append(
+                    Trial(
+                        trial_id=f"{subj}:{sec}:idx_{i}",
+                        user_id=subj,
+                        gesture_name="b",  # class_names[1]
+                        start=0,
+                        end=100,
+                        emg=np.zeros((100, 8), dtype=np.float32),
+                    )
+                )
     for i in range(2):
-        trials.append(np.zeros((100, 8), dtype=np.float32))
-        labels.append(2)
-        subjects.append("test:s3")
-        tids.append(f"test:s3:trainingSamples:idx_{i}")
-    return Dataset(
-        trials=trials,
-        labels=np.asarray(labels, dtype=int),
-        subject_ids=np.asarray(subjects),
-        trial_ids=np.asarray(tids),
-        gesture_start=np.zeros(len(trials), dtype=int),
-        gesture_end=np.array([t.shape[0] for t in trials], dtype=int),
-        metadata=DatasetMetadata(
-            name="x",
-            version="0",
-            sampling_rate=200.0,
-            channels=[f"ch{i}" for i in range(1, 9)],
-            class_names=["a", "b", "c"],
-            content_hash="h",
-        ),
-    )
+        trials.append(
+            Trial(
+                trial_id=f"test:s3:trainingSamples:idx_{i}",
+                user_id="test:s3",
+                gesture_name="c",  # class_names[2]
+                start=0,
+                end=100,
+                emg=np.zeros((100, 8), dtype=np.float32),
+            )
+        )
+    return Dataset.from_trials(trials, metadata)
 
 
 def test_predefined_split_is_subject_independent():

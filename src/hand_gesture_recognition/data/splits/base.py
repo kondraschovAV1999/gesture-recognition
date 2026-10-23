@@ -18,22 +18,8 @@ class DataSplit:
 
 
 def _subset(dataset: Dataset, idx: np.ndarray) -> Dataset:
-    subjects_in_subset = [str(s) for s in np.unique(dataset.subject_ids[idx])]
-    subject_info = None
-    if dataset.subject_info is not None:
-        subject_info = dataset.subject_info.loc[
-            dataset.subject_info.index.isin(subjects_in_subset)
-        ]
-    return Dataset(
-        trials=[dataset.trials[i] for i in idx],
-        labels=dataset.labels[idx],
-        subject_ids=dataset.subject_ids[idx],
-        trial_ids=dataset.trial_ids[idx],
-        gesture_start=dataset.gesture_start[idx],
-        gesture_end=dataset.gesture_end[idx],
-        metadata=dataset.metadata,
-        subject_info=subject_info,
-    )
+    chosen = [dataset.trials[int(i)] for i in idx]
+    return Dataset.from_trials(chosen, dataset.metadata)
 
 
 def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:
@@ -119,9 +105,9 @@ def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:
     )
 
 
-def assert_no_group_leakage(split: DataSplit, group_field: str = "subject_ids") -> None:
+def assert_no_group_leakage(split: DataSplit, group_field: str = "user_id") -> None:
     def ids(d: Dataset) -> set:
-        return set(getattr(d, group_field).tolist())
+        return {getattr(t, group_field) for t in d.trials}
 
     tr, va, te = ids(split.train), ids(split.val), ids(split.test)
     if tr & va:
