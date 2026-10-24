@@ -1,16 +1,21 @@
 import numpy as np
 import pytest
 
+from hand_gesture_recognition.configuration.schema import GestureCropConfig
 from hand_gesture_recognition.data.datasets.base import (
     Dataset,
     DatasetMetadata,
     Trial,
     User,
 )
+from hand_gesture_recognition.data.gesture_crop import crop_to_gesture
 from hand_gesture_recognition.data.splits.base import DataSplit
 from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
 from hand_gesture_recognition.preprocessing.learned import PerChannelStandardScaler
-from hand_gesture_recognition.preprocessing.pipeline import PreprocessingPipeline
+from hand_gesture_recognition.preprocessing.pipeline import (
+    GestureCropStep,
+    PreprocessingPipeline,
+)
 from hand_gesture_recognition.preprocessing.signal import (
     ButterworthFilter,
     EnvelopeExtractor,
@@ -114,3 +119,33 @@ def test_pipeline_fits_baseline_on_train_then_rectifies():
         out.test.trials[0].emg,
     ):
         assert np.all(arr >= 0.0)
+
+
+def test_gesture_crop_step_delegates_to_crop_to_gesture():
+    meta = DatasetMetadata("x", "0", 200.0, ["c"], ["noGesture", "fist"], "h")
+    ds = Dataset.from_trials(
+        [
+            Trial(
+                "t1",
+                "s1",
+                "fist",
+                200,
+                300,
+                np.arange(500, dtype=np.float32).reshape(500, 1),
+            ),
+        ],
+        meta,
+    )
+    cfg = GestureCropConfig(enabled=True, pad_samples=100)
+    step = GestureCropStep(cfg)
+
+    # Marked dataset-level so the pipeline applies it as a whole-dataset step.
+    assert step.dataset_level is True
+
+    out = step.transform(ds)
+    expected = crop_to_gesture(ds, cfg)
+
+    # Delegates to crop_to_gesture: gesture [200, 300] + 100 pad -> [100, 400).
+    assert out.trials[0].emg.shape[0] == 300
+    assert (out.trials[0].start, out.trials[0].end) == (100, 200)
+    assert np.array_equal(out.trials[0].emg, expected.trials[0].emg)

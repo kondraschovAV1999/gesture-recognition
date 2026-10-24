@@ -23,6 +23,10 @@ from hand_gesture_recognition.evaluation.base import EvaluationResult, evaluate
 from hand_gesture_recognition.logging_setup.config import get_logger
 from hand_gesture_recognition.paths import resolve_path
 from hand_gesture_recognition.prediction.base import PartitionPredictions
+from hand_gesture_recognition.preprocessing.pipeline import (
+    GestureCropStep,
+    PreprocessingPipeline,
+)
 from hand_gesture_recognition.reporting.reporters import (
     HtmlReporter,
     JsonReporter,
@@ -47,6 +51,31 @@ class ExperimentRunner:
             "hand_gesture_recognition.runner", run_id=self.cfg.run_id
         )
         self.tracker = MlflowTracker(cfg.tracking)
+        self._preprocessing = self._build_preprocessing()
+
+    def _build_preprocessing(self) -> PreprocessingPipeline:
+        """Assemble the two-stage preprocessing pipeline from config.
+
+        ``pre_steps`` (pre-split, whole-dataset, no fit): gesture crop for the
+        recognition task. ``post_steps`` (post-split, fit-on-train): baseline
+        removal followed by the configured per-trial signal transformers — the
+        latter are skipped for ``two_level`` windowing, where they are applied
+        per big window inside the windowing strategy (Phase 4).
+        """
+        cfg = self.cfg
+        pre_steps = []
+        if cfg.task.name == "recognition" and cfg.gesture_crop.enabled:
+            pre_steps.append(GestureCropStep(cfg.gesture_crop))
+
+        post_steps = []
+        if cfg.baseline.enabled:
+            from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
+
+            post_steps.append(BaselineRemoval(mode=cfg.baseline.mode))
+        if cfg.windowing.mode != "two_level":
+            post_steps.extend(instantiate(s) for s in cfg.signal_processing)
+
+        return PreprocessingPipeline(pre_steps=pre_steps, post_steps=post_steps)
 
     def run(self) -> EvaluationResult:
         cfg = self.cfg
@@ -64,10 +93,7 @@ class ExperimentRunner:
             with stage(self.logger, "analytics"):
                 self._analytics(raw_dataset)
             with stage(self.logger, "gesture_crop"):
-                if cfg.task.name == "recognition":
-                    cropped = self._gesture_crop(raw_dataset)
-                else:
-                    cropped = raw_dataset
+                cropped = self._preprocessing.transform_dataset(raw_dataset)
 
             # Global class set: no-gesture remap computed once from the FULL
             # dataset so every fold/partition shares the same mapping.
@@ -130,7 +156,14 @@ class ExperimentRunner:
             processed_dataset = (
                 viz_baseline.transform(cropped) if viz_baseline is not None else cropped
             )
-            processed_dataset = self._apply_signal_processing(processed_dataset)
+            for step_cfg in cfg.signal_processing:
+                step = instantiate(step_cfg)
+                processed_dataset = processed_dataset.replace_trials(
+                    [
+                        replace(t, emg=step.transform(t.emg))
+                        for t in processed_dataset.trials
+                    ]
+                )
 
             with stage(self.logger, "track_and_report"):
                 self.tracker.log_dataset(cropped)
@@ -168,23 +201,17 @@ class ExperimentRunner:
             raise
 
     def _run_partition(self, split, class_names, remap, dataset_name):
-        """Run baseline -> class selection -> signal -> window -> train -> evaluate
+        """Run preprocessing -> class selection -> window -> train -> evaluate
         on a single DataSplit. Returns (predictions, {part: result-or-None},
         transformed_split) where transformed_split is the post-class-selection /
-        post-signal-processing split used for windowing and prediction (so the
+        post-preprocessing split used for windowing and prediction (so the
         prediction-overlay visualizations align with predictions)."""
-        baseline_remover = None
-        if self.cfg.baseline.enabled:
-            from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
-
-            baseline_remover = BaselineRemoval(mode=self.cfg.baseline.mode).fit(
-                split.train
-            )
-            split = DataSplit(
-                train=baseline_remover.transform(split.train),
-                val=baseline_remover.transform(split.val),
-                test=baseline_remover.transform(split.test),
-            )
+        # Baseline removal + signal transformers via the fitted pipeline
+        # (fit-on-train: the stateful baseline step is fit on `split.train`
+        # only, then all partitions are transformed). For two_level windowing
+        # the signal steps are excluded from the pipeline and applied per big
+        # window inside the windowing builder instead (Phase 4).
+        split = self._preprocessing.fit(split).transform(split)
         if self._should_drop_no_gesture():
             from hand_gesture_recognition.data.class_selection import drop_no_gesture
 
@@ -193,9 +220,6 @@ class ExperimentRunner:
                 val=drop_no_gesture(split.val, remap, class_names),
                 test=drop_no_gesture(split.test, remap, class_names),
             )
-        if self.cfg.windowing.mode != "two_level":
-            # two-level filters per big window inside the builder instead
-            split = self._signal_processing(split)
         with stage(self.logger, "windowing"):
             windowed = self._window(split)
         with stage(self.logger, "train"):
@@ -260,37 +284,6 @@ class ExperimentRunner:
         # (the config default is a relative path, which only works when the
         # process runs from the repo root).
         return loader.load(resolve_path(self.cfg.dataset.path))
-
-    def _apply_signal_steps(self, trials):
-        if not self.cfg.signal_processing:
-            return trials
-        steps = [instantiate(step_cfg) for step_cfg in self.cfg.signal_processing]
-        for step in steps:
-            trials = [step.transform(t) for t in trials]
-        return trials
-
-    def _apply_signal_processing(self, dataset):
-        return replace(dataset, trials=self._apply_signal_steps(dataset.trials))
-
-    def _signal_processing(self, split):
-        # Deterministic per-trial steps; applied per-partition after baseline /
-        # class selection. Equivalent to the old pre-split application.
-        return DataSplit(
-            train=replace(
-                split.train, trials=self._apply_signal_steps(split.train.trials)
-            ),
-            val=replace(split.val, trials=self._apply_signal_steps(split.val.trials)),
-            test=replace(
-                split.test, trials=self._apply_signal_steps(split.test.trials)
-            ),
-        )
-
-    def _gesture_crop(self, dataset):
-        if not self.cfg.gesture_crop.enabled:
-            return dataset
-        from hand_gesture_recognition.data.gesture_crop import crop_to_gesture
-
-        return crop_to_gesture(dataset, self.cfg.gesture_crop)
 
     def _should_drop_no_gesture(self) -> bool:
         return (not self.cfg.dataset.include_no_gesture) or (

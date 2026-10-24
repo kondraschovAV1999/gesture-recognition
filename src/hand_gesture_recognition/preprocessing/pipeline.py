@@ -106,3 +106,24 @@ class PreprocessingPipeline:
         for step in self.post_steps:
             out = _apply(step, out)
         return out
+
+
+class GestureCropStep:
+    """Adapt the stateless :func:`~hand_gesture_recognition.data.gesture_crop.crop_to_gesture`
+    function to the pipeline step interface.
+
+    Declares ``dataset_level = True`` so the pipeline treats it as a
+    whole-dataset transform (``transform`` takes and returns a :class:`Dataset`)
+    rather than a per-trial array step. It is a stateless ``pre_steps`` entry: it
+    has no ``fit`` and simply delegates to ``crop_to_gesture``.
+    """
+
+    dataset_level = True
+
+    def __init__(self, config):
+        self.config = config
+
+    def transform(self, dataset: Dataset) -> Dataset:
+        from hand_gesture_recognition.data.gesture_crop import crop_to_gesture
+
+        return crop_to_gesture(dataset, self.config)
