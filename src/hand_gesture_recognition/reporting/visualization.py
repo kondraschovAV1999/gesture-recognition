@@ -13,7 +13,6 @@ from hydra.utils import instantiate
 
 from hand_gesture_recognition.configuration.schema import VisualizationSelectionConfig
 from hand_gesture_recognition.data.datasets.base import Dataset
-from hand_gesture_recognition.data.windowing.base import window_dataset
 from hand_gesture_recognition.data.windowing.strategy import get_windowing_strategy
 from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
 from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
@@ -87,7 +86,7 @@ def plot_raw_signal(
     i = _trial_index(dataset, tid)
     trial = dataset.trials[i]
     fs = dataset.metadata.sampling_rate
-    n_ch = trial.shape[1]
+    n_ch = trial.emg.shape[1]
     if channels is None:
         channels = list(range(n_ch))
 
@@ -95,13 +94,13 @@ def plot_raw_signal(
         len(channels), 1, figsize=(12, 1.9 * len(channels)), squeeze=False
     )
     axes = axes[:, 0]
-    t = np.arange(trial.shape[0]) / fs
+    t = np.arange(trial.emg.shape[0]) / fs
     plotted = []
     for row, c in enumerate(channels):
-        axes[row].plot(t, trial[:, c], lw=0.6)
+        axes[row].plot(t, trial.emg[:, c], lw=0.6)
         axes[row].set_ylabel(f"ch{c + 1}")
-        plotted.append(trial[:, c])
-    _shade_gesture(axes, int(dataset.gesture_start[i]), int(dataset.gesture_end[i]), fs)
+        plotted.append(trial.emg[:, c])
+    _shade_gesture(axes, int(dataset.trials[i].start), int(dataset.trials[i].end), fs)
     if consistent_scale:
         _shared_ylim(axes, plotted)
 
@@ -194,7 +193,9 @@ def compute_stages(
         stages.append(("baseline_removed", cur))
     for step_cfg in signal_processing_steps:
         step = instantiate(step_cfg)
-        cur = replace(cur, trials=[step.transform(t) for t in cur.trials])
+        cur = cur.replace_trials(
+            [replace(t, emg=step.transform(t.emg)) for t in cur.trials]
+        )
         stages.append((stage_label(step_cfg), cur))
     return stages
 
@@ -256,9 +257,9 @@ def _plot_stage_grid(
     for r, ch in enumerate(channels):
         for c, (_, ds) in enumerate(stages):
             trial = ds.trials[trial_indices[c]]
-            t = np.arange(trial.shape[0]) / fs
-            axes[r, c].plot(t, trial[:, ch], lw=0.6)
-            traces.append(trial[:, ch])
+            t = np.arange(trial.emg.shape[0]) / fs
+            axes[r, c].plot(t, trial.emg[:, ch], lw=0.6)
+            traces.append(trial.emg[:, ch])
             if r == 0:
                 axes[r, c].set_title(stage_labels[c], fontsize=8)
             if c == 0:
@@ -321,7 +322,9 @@ def plot_feature_over_windows(
             .big
         )
     else:
-        wd = window_dataset(processed_dataset, windowing)
+        wd = get_windowing_strategy("recognition").window(
+            processed_dataset, windowing, []
+        )
     if wd.X.shape[0] == 0:
         return paths
     fs = processed_dataset.metadata.sampling_rate
@@ -404,23 +407,23 @@ def plot_predictions_on_signal(
     tid = example_tid
     if tid is None:
         # pick the first gesture trial as a meaningful example (rest trials
-        # have gesture_start < 0)
+        # have start < 0)
         for i in range(dataset.n_trials):
-            if int(dataset.gesture_start[i]) >= 0:
+            if int(dataset.trials[i].start) >= 0:
                 tid = str(dataset.trial_ids[i])
                 break
         tid = tid or str(dataset.trial_ids[0])
 
     i = _trial_index(dataset, tid)
     trial = dataset.trials[i]
-    g_start, g_end = int(dataset.gesture_start[i]), int(dataset.gesture_end[i])
+    g_start, g_end = int(dataset.trials[i].start), int(dataset.trials[i].end)
     true_label = int(dataset.labels[i])
-    n_ch = trial.shape[1]
+    n_ch = trial.emg.shape[1]
 
     fig, axes = _channel_axes(n_ch)
-    t = np.arange(trial.shape[0]) / fs
+    t = np.arange(trial.emg.shape[0]) / fs
     for c in range(n_ch):
-        axes[c].plot(t, trial[:, c], lw=0.6)
+        axes[c].plot(t, trial.emg[:, c], lw=0.6)
         axes[c].set_ylabel(f"ch{c + 1}")
     _shade_gesture(axes, g_start, g_end, fs)
 
@@ -489,12 +492,16 @@ def plot_signal_data_flow(
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
 
     if raw_trial is not None:
-        axes[0, 0].plot(np.arange(raw_trial.shape[0]) / fs, raw_trial[:, 0], lw=0.7)
+        axes[0, 0].plot(
+            np.arange(raw_trial.emg.shape[0]) / fs, raw_trial.emg[:, 0], lw=0.7
+        )
     axes[0, 0].set_title("raw signal (ch1)")
     axes[0, 0].set_xlabel("time (s)")
 
     if proc_trial is not None:
-        axes[0, 1].plot(np.arange(proc_trial.shape[0]) / fs, proc_trial[:, 0], lw=0.7)
+        axes[0, 1].plot(
+            np.arange(proc_trial.emg.shape[0]) / fs, proc_trial.emg[:, 0], lw=0.7
+        )
     axes[0, 1].set_title("signal-processed (ch1)")
     axes[0, 1].set_xlabel("time (s)")
 
@@ -546,7 +553,7 @@ def plot_fft_spectrum(
         # Two-level mode filters per big window, so the FFT is over big windows.
         wd = get_windowing_strategy("two_level").window(dataset, windowing, []).big
     else:
-        wd = window_dataset(dataset, windowing)
+        wd = get_windowing_strategy("recognition").window(dataset, windowing, [])
     if wd.X.shape[0] == 0:
         return None
     if window_index >= wd.X.shape[0]:
@@ -607,7 +614,7 @@ def plot_signal_processing_comparison(
     tid = example_tid
     if tid is None:
         for i in range(raw_dataset.n_trials):
-            if int(raw_dataset.gesture_start[i]) >= 0:
+            if int(raw_dataset.trials[i].start) >= 0:
                 tid = str(raw_dataset.trial_ids[i])
                 break
         tid = tid or str(raw_dataset.trial_ids[0])
@@ -616,14 +623,14 @@ def plot_signal_processing_comparison(
     raw_trial = raw_dataset.trials[i]
     proc_trial = processed_dataset.trials[_trial_index(processed_dataset, tid)]
     fs = raw_dataset.metadata.sampling_rate
-    n_ch = raw_trial.shape[1]
+    n_ch = raw_trial.emg.shape[1]
 
     fig, axes = plt.subplots(n_ch, 2, figsize=(12, 1.8 * n_ch), squeeze=False)
-    t_raw = np.arange(raw_trial.shape[0]) / fs
-    t_proc = np.arange(proc_trial.shape[0]) / fs
+    t_raw = np.arange(raw_trial.emg.shape[0]) / fs
+    t_proc = np.arange(proc_trial.emg.shape[0]) / fs
     for c in range(n_ch):
-        axes[c, 0].plot(t_raw, raw_trial[:, c], lw=0.6)
-        axes[c, 1].plot(t_proc, proc_trial[:, c], lw=0.6, color="tab:orange")
+        axes[c, 0].plot(t_raw, raw_trial.emg[:, c], lw=0.6)
+        axes[c, 1].plot(t_proc, proc_trial.emg[:, c], lw=0.6, color="tab:orange")
         axes[c, 0].set_ylabel(f"ch{c + 1}")
     axes[0, 0].set_title("raw")
     axes[0, 1].set_title("signal-processed")

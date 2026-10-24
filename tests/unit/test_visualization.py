@@ -51,7 +51,7 @@ def test_plot_signal_processing_comparison(tmp_path):
         n_channels=4,
         seed=0,
     )
-    proc = replace(raw, trials=[np.abs(t) for t in raw.trials])
+    proc = raw.replace_trials([replace(t, emg=np.abs(t.emg)) for t in raw.trials])
     path = str(tmp_path / "signal_processing_comparison.png")
     fig = plot_signal_processing_comparison(raw, proc, path=path)
     assert fig is not None
@@ -135,8 +135,8 @@ def test_consistent_scale_shares_ylim():
         n_channels=3,
         seed=0,
     )
-    ds.trials[0][:, 1] *= 100.0
-    ds.trials[0][:, 2] *= 0.01
+    ds.trials[0].emg[:, 1] *= 100.0
+    ds.trials[0].emg[:, 2] *= 0.01
     fig = plot_raw_signal(ds, channels=[0, 1, 2], consistent_scale=True)
     ylims = [tuple(ax.get_ylim()) for ax in fig.axes]
     assert ylims[0] == ylims[1] == ylims[2]
@@ -219,7 +219,12 @@ def test_plot_raw_signal_by_class_maps_original_labels(monkeypatch, tmp_path):
     from hand_gesture_recognition.configuration.schema import (
         VisualizationSelectionConfig,
     )
-    from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata
+    from hand_gesture_recognition.data.datasets.base import (
+        Dataset,
+        DatasetMetadata,
+        Trial,
+        User,
+    )
     from hand_gesture_recognition.reporting import visualization as viz
     from hand_gesture_recognition.reporting.visualization import (
         plot_raw_signal_by_class,
@@ -228,15 +233,6 @@ def test_plot_raw_signal_by_class_maps_original_labels(monkeypatch, tmp_path):
 
     # trial 0 = noGesture (label 0), trial 1 = fist (label 1)
     ds = Dataset(
-        trials=[
-            np.zeros((50, 2), dtype=np.float32),
-            np.ones((50, 2), dtype=np.float32),
-        ],
-        labels=np.asarray([0, 1], dtype=int),
-        subject_ids=np.asarray(["s0", "s0"]),
-        trial_ids=np.asarray(["s0_t0", "s0_t1"]),
-        gesture_start=np.asarray([-1, 0], dtype=int),
-        gesture_end=np.asarray([-1, 50], dtype=int),
         metadata=DatasetMetadata(
             name="x",
             version="0",
@@ -245,6 +241,29 @@ def test_plot_raw_signal_by_class_maps_original_labels(monkeypatch, tmp_path):
             class_names=["noGesture", "fist"],
             content_hash="h",
         ),
+        users=[
+            User(
+                user_id="s0",
+                trials=[
+                    Trial(
+                        trial_id="s0_t0",
+                        user_id="s0",
+                        gesture_name="noGesture",
+                        start=-1,
+                        end=-1,
+                        emg=np.zeros((50, 2), dtype=np.float32),
+                    ),
+                    Trial(
+                        trial_id="s0_t1",
+                        user_id="s0",
+                        gesture_name="fist",
+                        start=0,
+                        end=50,
+                        emg=np.ones((50, 2), dtype=np.float32),
+                    ),
+                ],
+            )
+        ],
     )
 
     captured = {}
