@@ -20,6 +20,10 @@ class BaselineRemoval(BaseEstimator):
     no baseline).
     """
 
+    # Marks this step as dataset-level: ``fit``/``transform`` take and return a
+    # whole ``Dataset`` (see ``preprocessing.pipeline``).
+    dataset_level = True
+
     def __init__(self, mode: str = "global"):
         self.mode = mode
         self.baseline_: Optional[Union[np.ndarray, Dict[str, np.ndarray]]] = None

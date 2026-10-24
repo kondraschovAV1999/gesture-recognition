@@ -1,7 +1,16 @@
 import numpy as np
 import pytest
 
+from hand_gesture_recognition.data.datasets.base import (
+    Dataset,
+    DatasetMetadata,
+    Trial,
+    User,
+)
+from hand_gesture_recognition.data.splits.base import DataSplit
+from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
 from hand_gesture_recognition.preprocessing.learned import PerChannelStandardScaler
+from hand_gesture_recognition.preprocessing.pipeline import PreprocessingPipeline
 from hand_gesture_recognition.preprocessing.signal import (
     ButterworthFilter,
     EnvelopeExtractor,
@@ -62,3 +71,28 @@ def test_per_channel_scaler_uses_train_stats_only():
     # test transformed with TRAIN stats -> not zero mean (it has loc=5 offset)
     assert not np.allclose(out_test.mean(axis=(0, 1)), 0.0, atol=1e-2)
     assert np.allclose(out_train.mean(axis=(0, 1)), 0.0, atol=1e-5)
+
+
+def _ds(values):
+    meta = DatasetMetadata("x", "0", 200.0, ["c"], ["noGesture", "fist"], "h")
+    rest = User(
+        "u1", [Trial("t0", "u1", "noGesture", -1, -1, np.full((4, 1), 5.0, np.float32))]
+    )
+    gest = User(
+        "u1", [Trial("t1", "u1", "fist", 0, 4, np.full((4, 1), 10.0, np.float32))]
+    )
+    return Dataset(meta, [rest, gest])
+
+
+def test_pipeline_fits_baseline_on_train_then_rectifies():
+    train = _ds(10.0)
+    val = _ds(10.0)
+    split = DataSplit(train=train, val=val, test=val)
+    p = PreprocessingPipeline(
+        pre_steps=[], post_steps=[BaselineRemoval(mode="global"), RectifyTransformer()]
+    )
+    p.fit(split)
+    out = p.transform(split)
+    # rest level 5 subtracted from all trials, then rectified to >= 0
+    assert np.all(out.train.trials[1].emg >= 0.0)
+    assert np.all(out.val.trials[0].emg >= 0.0)
