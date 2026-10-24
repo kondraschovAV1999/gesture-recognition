@@ -400,7 +400,12 @@ def plot_predictions_on_signal(
     annotated on channel 1 (green = correct, red = wrong)."""
     if dataset.n_trials == 0:
         return None
-    test_wd = get_windowing_strategy(task).window(dataset, windowing, None)
+    if getattr(windowing, "mode", "single") == "two_level":
+        test_wd = (
+            get_windowing_strategy("two_level").window(dataset, windowing, None).big
+        )
+    else:
+        test_wd = get_windowing_strategy(task).window(dataset, windowing, None)
     fs = dataset.metadata.sampling_rate
     ws = test_wd.X.shape[1]
 
@@ -486,7 +491,14 @@ def plot_signal_data_flow(
 
     raw_trial = find_trial(raw_dataset, tid)
     proc_trial = find_trial(processed_dataset, tid)
-    test_wd = get_windowing_strategy(task).window(test_dataset, windowing, None)
+    if getattr(windowing, "mode", "single") == "two_level":
+        test_wd = (
+            get_windowing_strategy("two_level")
+            .window(test_dataset, windowing, None)
+            .big
+        )
+    else:
+        test_wd = get_windowing_strategy(task).window(test_dataset, windowing, None)
     mask = test_wd.metadata.trial_ids == tid
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
