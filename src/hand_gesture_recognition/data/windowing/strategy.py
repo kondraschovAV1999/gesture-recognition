@@ -101,7 +101,9 @@ class TwoLevelWindowing:
                 t.trial_id,
                 "big",
                 rest_bounds=(t.start, t.end),  # rest trial -> (-1,-1) -> all rest
-                drop_rest=getattr(dataset.metadata, "drop_rest_windows", False),
+                drop_rest=(
+                    dataset.metadata.no_gesture_name not in dataset.metadata.class_names
+                ),
             )
             for j in range(len(y)):
                 big = X[j]

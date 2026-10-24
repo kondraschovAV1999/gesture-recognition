@@ -109,3 +109,54 @@ def test_window_dataset_matches_flat_behavior():
     ]
     assert wd.metadata.window_start.tolist() == [0, 2, 4, 6, 0, 2, 4, 6]
     assert wd.metadata.window_ids[0] == "s1_t1_window0"
+
+
+def test_window_dataset_drops_rest_windows_when_no_gesture_dropped():
+    # A single gesture trial whose EMG extends beyond the gesture interval
+    # [start, end]. With ws=40, stride=20 the trailing context (samples 80..139)
+    # produces windows that fall entirely outside [start, end] (rest windows).
+    # (An emg length of ~100 is too short to isolate a 40-sample rest window,
+    # so use 140 to actually exercise the drop path.)
+    emg_len = 140
+    start, end = 20, 80
+    trial = Trial(
+        "t1",
+        "s1",
+        "fist",
+        start,
+        end,
+        np.arange(emg_len, dtype=np.float32)[:, None],
+    )
+
+    # Dropped config: class_names=["fist"], so label 0 now means "fist" and any
+    # rest window (which would be labeled 0) must be dropped entirely.
+    dropped_meta = DatasetMetadata(
+        name="x",
+        version="0",
+        sampling_rate=200.0,
+        channels=["c1"],
+        class_names=["fist"],
+        content_hash="h",
+        no_gesture_name="noGesture",
+    )
+    dropped = Dataset.from_trials([trial], dropped_meta)
+    wd = window_dataset(dropped, _cfg(40, 20))
+    assert wd.y.tolist() == [0, 0, 0, 0]  # all "fist"
+    assert wd.metadata.window_start.tolist() == [0, 20, 40, 60]
+    # No window lies fully outside the gesture interval [start, end]:
+    assert (wd.metadata.window_start >= end).sum() == 0
+    assert (wd.metadata.window_end <= start).sum() == 0
+
+    # Recognition config (no-gesture kept) still emits rest windows labeled 0.
+    kept_meta = DatasetMetadata(
+        name="x",
+        version="0",
+        sampling_rate=200.0,
+        channels=["c1"],
+        class_names=["noGesture", "fist"],
+        content_hash="h",
+    )
+    kept = Dataset.from_trials([trial], kept_meta)
+    wd_kept = window_dataset(kept, _cfg(40, 20))
+    assert wd_kept.y.tolist() == [1, 1, 1, 1, 0, 0]
+    assert wd_kept.metadata.window_start.tolist() == [0, 20, 40, 60, 80, 100]

@@ -83,7 +83,7 @@ def window_emg(
     if rest_bounds is not None:
         g_start, g_end = rest_bounds
     n = (length - ws) // stride + 1
-    xs, ys, starts, ends = [], [], [], []
+    xs, ys, starts, ends, wins = [], [], [], [], []
     for i in range(n):
         s = i * stride
         e = s + ws
@@ -97,7 +97,7 @@ def window_emg(
         ys.append(0 if is_rest else int(label))
         starts.append(s)
         ends.append(e)
-    wins = [f"{subject_id}_{trial_id}_{prefix}{i}" for i in range(len(xs))]
+        wins.append(f"{subject_id}_{trial_id}_{prefix}{i}")
     meta = WindowMetadata(
         window_start=np.asarray(starts, int),
         window_end=np.asarray(ends, int),
@@ -112,7 +112,10 @@ def window_emg(
 def window_dataset(dataset: Dataset, config: WindowingConfig) -> WindowedDataset:
     ws, stride = config.resolve(sampling_rate=dataset.metadata.sampling_rate)
     resolved = replace(config, window_size_samples=ws, stride_samples=stride)
-    drop_rest = getattr(dataset.metadata, "drop_rest_windows", False)
+    # After no-gesture is dropped, class_names no longer contains no_gesture_name;
+    # in that case rest windows (label 0) would collide with a real gesture, so
+    # they must be dropped. This replaces the old drop_rest_windows metadata flag.
+    drop_rest = dataset.metadata.no_gesture_name not in dataset.metadata.class_names
     Xs, ys, metas = [], [], []
     for t in dataset.trials:
         X, y, m = window_emg(
