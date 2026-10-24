@@ -14,7 +14,7 @@ from hydra.utils import instantiate
 from hand_gesture_recognition.configuration.schema import VisualizationSelectionConfig
 from hand_gesture_recognition.data.datasets.base import Dataset
 from hand_gesture_recognition.data.windowing.base import window_dataset
-from hand_gesture_recognition.data.windowing.dispatch import build_windowed_dataset
+from hand_gesture_recognition.data.windowing.strategy import get_windowing_strategy
 from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
 from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
 from hand_gesture_recognition.prediction.base import Prediction
@@ -315,9 +315,11 @@ def plot_feature_over_windows(
     if getattr(windowing, "mode", "single") == "two_level":
         # Two-level mode filters per big window (small windows are carved from
         # the filtered big window), so features belong to the big windows.
-        from hand_gesture_recognition.data.windowing.two_level import window_big_windows
-
-        wd = window_big_windows(processed_dataset, windowing, [])
+        wd = (
+            get_windowing_strategy("two_level")
+            .window(processed_dataset, windowing, [])
+            .big
+        )
     else:
         wd = window_dataset(processed_dataset, windowing)
     if wd.X.shape[0] == 0:
@@ -395,7 +397,7 @@ def plot_predictions_on_signal(
     annotated on channel 1 (green = correct, red = wrong)."""
     if dataset.n_trials == 0:
         return None
-    test_wd = build_windowed_dataset(dataset, windowing, task)
+    test_wd = get_windowing_strategy(task).window(dataset, windowing, None)
     fs = dataset.metadata.sampling_rate
     ws = test_wd.X.shape[1]
 
@@ -481,7 +483,7 @@ def plot_signal_data_flow(
 
     raw_trial = find_trial(raw_dataset, tid)
     proc_trial = find_trial(processed_dataset, tid)
-    test_wd = build_windowed_dataset(test_dataset, windowing, task)
+    test_wd = get_windowing_strategy(task).window(test_dataset, windowing, None)
     mask = test_wd.metadata.trial_ids == tid
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
@@ -542,9 +544,7 @@ def plot_fft_spectrum(
     fs = sampling_rate if sampling_rate is not None else dataset.metadata.sampling_rate
     if getattr(windowing, "mode", "single") == "two_level":
         # Two-level mode filters per big window, so the FFT is over big windows.
-        from hand_gesture_recognition.data.windowing.two_level import window_big_windows
-
-        wd = window_big_windows(dataset, windowing, [])
+        wd = get_windowing_strategy("two_level").window(dataset, windowing, []).big
     else:
         wd = window_dataset(dataset, windowing)
     if wd.X.shape[0] == 0:

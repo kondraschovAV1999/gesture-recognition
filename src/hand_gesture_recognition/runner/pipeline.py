@@ -318,7 +318,38 @@ class Pipeline:
                 split_info={"strategy": self.cfg.split.strategy},
                 class_names=class_names,
             )
+        if self.cfg.evaluation.breakdown_by:
+            self._log_grouped(predictions, class_names, dataset_name)
         return predictions, results, split
+
+    def _log_grouped(self, predictions, class_names, dataset_name) -> None:
+        """Log per-group metrics for each configured ``evaluation.breakdown_by`` key.
+
+        For the test partition (and val when present), each group's metrics are
+        logged under ``{metric}_{group}`` (e.g. ``accuracy_s01``) via the tracker.
+        Non-breaking: this only logs; the returned ``result`` is unchanged.
+        """
+        from hand_gesture_recognition.evaluation.grouped import evaluate_grouped
+
+        for by in self.cfg.evaluation.breakdown_by:
+            for part in ("val", "test"):
+                pred = getattr(predictions, part, None)
+                if pred is None or np.asarray(pred.y_true).size == 0:
+                    continue
+                grouped = evaluate_grouped(
+                    pred,
+                    by,
+                    self.cfg.evaluation,
+                    dataset_id=dataset_name,
+                    class_names=class_names,
+                )
+                for group, g_result in grouped.items():
+                    self.tracker.log_metrics(
+                        {
+                            f"{metric}_{group}": value
+                            for metric, value in g_result.metrics.items()
+                        }
+                    )
 
     def _window(self, split):
         """Window each partition via the resolved windowing strategy.

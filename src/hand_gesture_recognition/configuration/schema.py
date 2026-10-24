@@ -333,6 +333,9 @@ class EvaluationConfig:
     )
     average: str = "macro"
     exclude_classes: List[int] = field(default_factory=list)
+    breakdown_by: List[str] = field(
+        default_factory=list
+    )  # subset of {"subject_id","trial_id","y_true"}
 
 
 @dataclass

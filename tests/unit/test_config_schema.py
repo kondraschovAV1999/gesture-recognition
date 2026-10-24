@@ -195,3 +195,13 @@ def test_feature_extraction_validate_rejects_custom_without_features():
     f = FeatureExtractionConfig(feature_type="custom")
     with pytest.raises(ConfigValidationError):
         f.validate()
+
+
+def test_evaluation_breakdown_by_parses_and_validates():
+    from hand_gesture_recognition.configuration.schema import EvaluationConfig
+
+    assert EvaluationConfig(breakdown_by=["subject_id"]).breakdown_by == ["subject_id"]
+    cfg = _base_experiment()
+    cfg.evaluation.breakdown_by = ["subject_id", "trial_id", "y_true"]
+    out = validate_experiment_config(cfg)
+    assert out.evaluation.breakdown_by == ["subject_id", "trial_id", "y_true"]
