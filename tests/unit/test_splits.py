@@ -12,6 +12,7 @@ from hand_gesture_recognition.data.splits.base import (
     assert_no_group_leakage,
     split_dataset,
 )
+from hand_gesture_recognition.data.splits.strategy import get_split_strategy
 
 
 def test_group_wise_split_has_no_leakage():
@@ -69,6 +70,20 @@ def test_trial_wise_split_is_trial_level():
     assert (
         split.train.n_trials + split.val.n_trials + split.test.n_trials == ds.n_trials
     )
+
+
+def test_random_and_trial_wise_produce_identical_partitions():
+    ds = make_synthetic_dataset(n_subjects=4, n_trials_per_subject=5, seed=0)
+    cfg = SplitConfig(
+        strategy="random", train_ratio=0.6, val_ratio=0.2, test_ratio=0.2, seed=7
+    )
+    random_split = get_split_strategy("random").split(ds, cfg)
+    trial_wise_split = get_split_strategy("trial_wise").split(ds, cfg)
+
+    for part in ("train", "val", "test"):
+        a = sorted(getattr(random_split, part).trial_ids)
+        b = sorted(getattr(trial_wise_split, part).trial_ids)
+        assert a == b
 
 
 def test_leakage_detection_raises():
