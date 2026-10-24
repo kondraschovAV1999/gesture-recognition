@@ -55,6 +55,32 @@ from hand_gesture_recognition.tracing.stage import stage
 from hand_gesture_recognition.training import classical, neural  # noqa: F401
 from hand_gesture_recognition.training.base import get_training_strategy
 
+__all__ = ["Pipeline", "PipelineBuilder"]
+
+
+class PipelineBuilder:
+    """Builds a :class:`Pipeline` from the experiment's dependencies.
+
+    Strategy resolution (split, CV, windowing, training) and preprocessing
+    construction already live in ``Pipeline.__init__`` (Task 5.1); this builder
+    is a thin wrapper so the Phase 5.3 facade can construct a Pipeline without
+    coupling to that constructor directly.
+    """
+
+    def __init__(self, cfg, logger, tracker, output_root):
+        self.cfg = cfg
+        self.logger = logger
+        self.tracker = tracker
+        self.output_root = output_root
+
+    def build(self) -> Pipeline:
+        return Pipeline(
+            cfg=self.cfg,
+            logger=self.logger,
+            tracker=self.tracker,
+            output_root=self.output_root,
+        )
+
 
 class Pipeline:
     """Template Method orchestrating a full experiment run.
