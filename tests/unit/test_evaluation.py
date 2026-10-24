@@ -117,3 +117,26 @@ def test_evaluate_grouped_by_subject():
     assert set(out) == {"A", "B"}
     assert out["A"].metrics["accuracy"] == 0.5
     assert out["B"].metrics["accuracy"] == 1.0
+
+
+def test_evaluate_grouped_empty_returns_empty_dict():
+    p = Prediction(
+        run_id="r",
+        sample_ids=np.arange(0),
+        subject_ids=np.array([], dtype=object),
+        trial_ids=np.array([], dtype=object),
+        y_true=np.array([], dtype=int),
+        y_pred=np.array([], dtype=int),
+        y_score=None,
+        prediction_duration_s=0.0,
+        backend="classical",
+    )
+    assert (
+        evaluate_grouped(p, by="subject_id", config=EvaluationConfig(), dataset_id="d")
+        == {}
+    )
+
+
+def test_evaluate_grouped_unknown_key_raises():
+    with pytest.raises(ValueError):
+        evaluate_grouped(_pred(), by="bogus", config=EvaluationConfig(), dataset_id="d")

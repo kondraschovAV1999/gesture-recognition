@@ -1,14 +1,17 @@
+import logging
+
 from hand_gesture_recognition.evaluation.base import evaluate
+
+logger = logging.getLogger("hand_gesture_recognition")
 
 
 def evaluate_grouped(prediction, by, config, dataset_id, class_names=None):
     """Split a Prediction by a lineage key and evaluate each group.
 
     `by` is one of "subject_id", "trial_id", or "y_true" (per-gesture). Returns
-    a dict {group_key: EvaluationResult}. Groups with no samples are skipped
-    (logged via `logging.getLogger("hand_gesture_recognition").warning`).
+    a dict {group_key: EvaluationResult}. Empty inputs are logged and return an
+    empty dict.
     """
-    import logging
     import numpy as np
     from dataclasses import replace
 
@@ -21,11 +24,13 @@ def evaluate_grouped(prediction, by, config, dataset_id, class_names=None):
     else:
         raise ValueError(f"unknown grouping key: {by!r}")
 
+    if keys.size == 0:
+        logger.warning("evaluate_grouped: empty prediction for by=%r", by)
+        return {}
+
     out = {}
     for key in sorted(set(keys.tolist())):
         mask = keys == key
-        if not mask.any():
-            continue
         sub = replace(
             prediction,
             sample_ids=np.asarray(prediction.sample_ids)[mask],
