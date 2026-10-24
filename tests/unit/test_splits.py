@@ -2,12 +2,12 @@ import numpy as np
 import pytest
 
 from hand_gesture_recognition.configuration.schema import SplitConfig
-from hand_gesture_recognition.data.datasets.base import (
+from hand_gesture_recognition.utils.datasets import (
     Dataset,
     DatasetMetadata,
     Trial,
 )
-from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
+from hand_gesture_recognition.utils.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.pipeline.splits.base import (
     assert_no_group_leakage,
     split_dataset,

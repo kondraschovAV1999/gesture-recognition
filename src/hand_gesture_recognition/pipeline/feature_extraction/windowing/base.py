@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import WindowingConfig
-from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.utils.datasets import Dataset
 
 
 @dataclass

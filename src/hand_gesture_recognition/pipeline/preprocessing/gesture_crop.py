@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import GestureCropConfig
-from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.utils.datasets import Dataset
 
 
 def crop_to_gesture(dataset: Dataset, config: GestureCropConfig) -> Dataset:

@@ -7,13 +7,13 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
 
-from hand_gesture_recognition.data.datasets.base import (
+from hand_gesture_recognition.utils.datasets import (
     Dataset,
     DatasetMetadata,
     Trial,
     User,
 )
-from hand_gesture_recognition.data.hashing import hash_directory_cached
+from hand_gesture_recognition.utils.hashing import hash_directory_cached
 from hand_gesture_recognition.pipeline.data_loaders.base import DatasetLoader
 
 GESTURE_LABELS = {

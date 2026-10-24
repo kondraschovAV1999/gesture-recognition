@@ -2,7 +2,7 @@ from hand_gesture_recognition.configuration.schema import (
     CrossValidationConfig,
     SplitConfig,
 )
-from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
+from hand_gesture_recognition.utils.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.pipeline.splits.base import assert_no_group_leakage
 from hand_gesture_recognition.pipeline.splits.folds import generate_folds
 from hand_gesture_recognition.pipeline.splits.strategy import (

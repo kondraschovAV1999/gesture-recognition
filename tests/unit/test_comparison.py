@@ -4,7 +4,7 @@ import pytest
 def test_compare_runs(tmp_path):
     import mlflow
 
-    from hand_gesture_recognition.reporting.comparison import compare_runs
+    from hand_gesture_recognition.utils.observability.comparison import compare_runs
 
     uri = f"sqlite:///{tmp_path}/mlflow.db"
     mlflow.set_tracking_uri(uri)
@@ -22,7 +22,7 @@ def test_compare_runs_missing_run(tmp_path):
     import mlflow
     import pandas as pd
 
-    from hand_gesture_recognition.reporting.comparison import compare_runs
+    from hand_gesture_recognition.utils.observability.comparison import compare_runs
 
     uri = f"sqlite:///{tmp_path}/mlflow.db"
     mlflow.set_tracking_uri(uri)

@@ -1,12 +1,12 @@
 import numpy as np
 
-from hand_gesture_recognition.data.datasets.base import (
+from hand_gesture_recognition.utils.datasets import (
     Dataset,
     DatasetMetadata,
     Trial,
     User,
 )
-from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
+from hand_gesture_recognition.utils.fixtures import make_synthetic_dataset
 
 
 def _meta():

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import List, Optional
 
-from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.utils.datasets import Dataset
 from hand_gesture_recognition.pipeline.splits.base import DataSplit
 
 

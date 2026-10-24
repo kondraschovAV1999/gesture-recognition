@@ -12,7 +12,7 @@ import os
 import pytest
 
 from hand_gesture_recognition.pipeline.data_loaders.epn612 import EPN612Loader
-from hand_gesture_recognition.paths import resolve_path
+from hand_gesture_recognition.utils.paths import resolve_path
 
 DATA_PATH = resolve_path("resources/data/EPN612")
 HAS_REAL_DATA = os.path.isdir(DATA_PATH)

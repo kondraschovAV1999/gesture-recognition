@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import ExperimentConfig
-from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.utils.datasets import Dataset
 from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult
 
 

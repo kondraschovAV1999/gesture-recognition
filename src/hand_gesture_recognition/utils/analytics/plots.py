@@ -8,7 +8,7 @@ import matplotlib
 matplotlib.use("Agg")  # headless backend
 import matplotlib.pyplot as plt
 
-from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.utils.datasets import Dataset
 
 
 def plot_class_distribution(dataset: Dataset, path: str) -> None:

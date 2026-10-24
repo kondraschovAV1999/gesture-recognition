@@ -4,7 +4,7 @@ import pytest
 
 from hand_gesture_recognition.configuration.schema import TrackingConfig
 from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult
-from hand_gesture_recognition.tracking.mlflow_tracker import MlflowTracker
+from hand_gesture_recognition.utils.observability.tracking import MlflowTracker
 
 
 def test_tracker_logs_params_and_metrics(tmp_path):

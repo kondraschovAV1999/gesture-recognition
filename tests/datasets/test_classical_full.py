@@ -23,7 +23,7 @@ from hand_gesture_recognition.pipeline.splits.base import (
 )
 from hand_gesture_recognition.pipeline.evaluation.base import evaluate
 from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
-from hand_gesture_recognition.paths import resolve_path
+from hand_gesture_recognition.utils.paths import resolve_path
 
 DATA_PATH = resolve_path("resources/data/EPN612")
 HAS_REAL_DATA = os.path.isdir(DATA_PATH)

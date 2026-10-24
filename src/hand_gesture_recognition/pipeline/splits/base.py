@@ -6,7 +6,7 @@ from typing import List
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import SplitConfig
-from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.utils.datasets import Dataset
 
 
 @dataclass

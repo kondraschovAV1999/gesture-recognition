@@ -1,7 +1,7 @@
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import GestureCropConfig
-from hand_gesture_recognition.data.datasets.base import (
+from hand_gesture_recognition.utils.datasets import (
     Dataset,
     DatasetMetadata,
     Trial,
@@ -117,7 +117,7 @@ def test_crop_shifts_bounds():
     from hand_gesture_recognition.pipeline.preprocessing.gesture_crop import crop_to_gesture
     from hand_gesture_recognition.configuration.schema import GestureCropConfig
     import numpy as np
-    from hand_gesture_recognition.data.datasets.base import (
+    from hand_gesture_recognition.utils.datasets import (
         Dataset,
         DatasetMetadata,
         Trial,

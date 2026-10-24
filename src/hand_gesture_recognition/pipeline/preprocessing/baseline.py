@@ -6,7 +6,7 @@ from typing import Dict, Optional, Union, cast
 import numpy as np
 from sklearn.base import BaseEstimator
 
-from hand_gesture_recognition.data.datasets.base import Dataset, Trial
+from hand_gesture_recognition.utils.datasets import Dataset, Trial
 
 
 class BaselineRemoval(BaseEstimator):

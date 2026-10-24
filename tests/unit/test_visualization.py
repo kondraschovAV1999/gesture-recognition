@@ -4,14 +4,18 @@ from dataclasses import replace
 import matplotlib.pyplot as plt
 import numpy as np
 
-from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
+from hand_gesture_recognition.utils.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.configuration.schema import (
     VisualizationSelectionConfig,
     WindowingConfig,
 )
-from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
-from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import FrequencyDomainFeatures
-from hand_gesture_recognition.reporting.visualization import (
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import (
+    TimeDomainFeatures,
+)
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import (
+    FrequencyDomainFeatures,
+)
+from hand_gesture_recognition.utils.observability.visualization import (
     compute_stages,
     plot_feature_over_windows,
     plot_fft_spectrum,
@@ -153,7 +157,9 @@ def test_stage_label_and_compute_stages_order():
         seed=0,
     )
     steps = [
-        {"_target_": "hand_gesture_recognition.pipeline.preprocessing.signal.RectifyTransformer"}
+        {
+            "_target_": "hand_gesture_recognition.pipeline.preprocessing.signal.RectifyTransformer"
+        }
     ]
     stages = compute_stages(ds, steps, None)
     labels = [s[0] for s in stages]
@@ -173,7 +179,9 @@ def test_plot_stage_progression_grid(tmp_path, monkeypatch):
         seed=0,
     )
     steps = [
-        {"_target_": "hand_gesture_recognition.pipeline.preprocessing.signal.RectifyTransformer"}
+        {
+            "_target_": "hand_gesture_recognition.pipeline.preprocessing.signal.RectifyTransformer"
+        }
     ]
     stages = compute_stages(ds, steps, None)  # [("raw", ds), ("rectified", ds)]
     selection = {"class_0": [0, 1]}
@@ -219,14 +227,14 @@ def test_plot_raw_signal_by_class_maps_original_labels(monkeypatch, tmp_path):
     from hand_gesture_recognition.configuration.schema import (
         VisualizationSelectionConfig,
     )
-    from hand_gesture_recognition.data.datasets.base import (
+    from hand_gesture_recognition.utils.datasets import (
         Dataset,
         DatasetMetadata,
         Trial,
         User,
     )
-    from hand_gesture_recognition.reporting import visualization as viz
-    from hand_gesture_recognition.reporting.visualization import (
+    from hand_gesture_recognition.utils.observability import visualization as viz
+    from hand_gesture_recognition.utils.observability.visualization import (
         plot_raw_signal_by_class,
         resolve_selection,
     )
@@ -287,8 +295,10 @@ import numpy as np
 from hand_gesture_recognition.pipeline.models.classical.adapter import (
     SklearnPredictionAdapter,
 )
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.gesture import window_gestures
-from hand_gesture_recognition.reporting.visualization import (
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.gesture import (
+    window_gestures,
+)
+from hand_gesture_recognition.utils.observability.visualization import (
     plot_predictions_on_signal,
     plot_signal_data_flow,
 )

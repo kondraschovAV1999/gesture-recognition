@@ -12,7 +12,7 @@ import numpy as np
 from hydra.utils import instantiate
 
 from hand_gesture_recognition.configuration.schema import VisualizationSelectionConfig
-from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.utils.datasets import Dataset
 from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import get_windowing_strategy
 from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import FrequencyDomainFeatures
 from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures

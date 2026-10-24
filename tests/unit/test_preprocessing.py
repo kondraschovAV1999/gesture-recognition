@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from hand_gesture_recognition.configuration.schema import GestureCropConfig
-from hand_gesture_recognition.data.datasets.base import (
+from hand_gesture_recognition.utils.datasets import (
     Dataset,
     DatasetMetadata,
     Trial,

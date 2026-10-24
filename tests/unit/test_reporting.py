@@ -4,7 +4,7 @@ import numpy as np
 
 from hand_gesture_recognition.configuration.schema import ExperimentConfig
 from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult
-from hand_gesture_recognition.reporting.reporters import JsonReporter, render_report
+from hand_gesture_recognition.utils.observability.reporting import JsonReporter, render_report
 
 
 def test_render_report_serializable():

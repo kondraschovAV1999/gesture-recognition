@@ -9,7 +9,7 @@ from hand_gesture_recognition.configuration.schema import (
     CrossValidationConfig,
     SplitConfig,
 )
-from hand_gesture_recognition.data.datasets.base import Dataset
+from hand_gesture_recognition.utils.datasets import Dataset
 from hand_gesture_recognition.pipeline.splits.base import (
     DataSplit,
     _subset,

@@ -22,7 +22,7 @@ import numpy as np
 from hydra.utils import instantiate
 
 from hand_gesture_recognition.configuration.loader import save_resolved_config
-from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
+from hand_gesture_recognition.utils.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.pipeline.splits.base import (
     DataSplit,
     assert_no_group_leakage,
@@ -40,17 +40,17 @@ from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy imp
 )
 from hand_gesture_recognition.pipeline.evaluation.aggregate import aggregate_folds
 from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult, evaluate
-from hand_gesture_recognition.paths import resolve_path
+from hand_gesture_recognition.utils.paths import resolve_path
 from hand_gesture_recognition.pipeline.preprocessing.pipeline import (
     GestureCropStep,
     PreprocessingPipeline,
 )
-from hand_gesture_recognition.reporting.reporters import (
+from hand_gesture_recognition.utils.observability.reporting import (
     HtmlReporter,
     JsonReporter,
     render_report,
 )
-from hand_gesture_recognition.tracing.stage import stage
+from hand_gesture_recognition.utils.observability.tracing import stage
 
 # Import the concrete training strategies so their registry decorators run
 # before ``get_training_strategy`` is called in ``Pipeline.__init__``.
@@ -241,15 +241,15 @@ class Pipeline:
         """Write dataset summary + optional QC artifacts."""
         if not self.cfg.analytics.enabled:
             return
-        from hand_gesture_recognition.analytics.stats import dataset_summary
+        from hand_gesture_recognition.utils.analytics.stats import dataset_summary
 
         d = os.path.join(self.output_root, "analytics", dataset.metadata.name)
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "dataset_summary.json"), "w") as f:
             json.dump(dataset_summary(dataset), f, indent=2)
         if self.cfg.analytics.run_qc:
-            from hand_gesture_recognition.analytics.qc import run_quality_checks
-            from hand_gesture_recognition.analytics.plots import plot_class_distribution
+            from hand_gesture_recognition.utils.analytics.qc import run_quality_checks
+            from hand_gesture_recognition.utils.analytics.plots import plot_class_distribution
 
             with open(os.path.join(d, "quality_checks.json"), "w") as f:
                 json.dump(run_quality_checks(dataset), f, indent=2)
@@ -268,7 +268,7 @@ class Pipeline:
         class_names = cropped.metadata.class_names
         remap = None
         if self._should_drop_no_gesture():
-            from hand_gesture_recognition.data.class_selection import (
+            from hand_gesture_recognition.utils.class_selection import (
                 build_no_gesture_remap,
             )
 
@@ -303,7 +303,7 @@ class Pipeline:
         # window inside the windowing strategy instead (Phase 4).
         split = self._preprocessing.fit(split).transform(split)
         if self._should_drop_no_gesture():
-            from hand_gesture_recognition.data.class_selection import drop_no_gesture
+            from hand_gesture_recognition.utils.class_selection import drop_no_gesture
 
             split = DataSplit(
                 train=drop_no_gesture(split.train, remap, class_names),
@@ -479,7 +479,7 @@ class Pipeline:
         vis = self.cfg.visualization
         if not vis.enabled:
             return
-        from hand_gesture_recognition.reporting.visualization import (
+        from hand_gesture_recognition.utils.observability.visualization import (
             compute_stages,
             plot_fft_spectrum,
             plot_feature_over_windows,

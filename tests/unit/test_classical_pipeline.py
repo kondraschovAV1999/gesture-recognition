@@ -7,7 +7,7 @@ from hand_gesture_recognition.pipeline.models.classical.random_forest import (
 )
 from hand_gesture_recognition.pipeline.models.classical.windowing import WindowingTransformer
 from hand_gesture_recognition.configuration.schema import WindowingConfig
-from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
+from hand_gesture_recognition.utils.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
 from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import FrequencyDomainFeatures
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from hand_gesture_recognition.reporting.comparison import compare_runs
+from hand_gesture_recognition.utils.observability.comparison import compare_runs
 
 
 def main() -> None:

@@ -1,9 +1,9 @@
 import numpy as np
-from hand_gesture_recognition.data.class_selection import (
+from hand_gesture_recognition.utils.class_selection import (
     build_no_gesture_remap,
     drop_no_gesture,
 )
-from hand_gesture_recognition.data.datasets.base import (
+from hand_gesture_recognition.utils.datasets import (
     Dataset,
     DatasetMetadata,
     Trial,
