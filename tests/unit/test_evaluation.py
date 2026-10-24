@@ -3,6 +3,7 @@ import pytest
 
 from hand_gesture_recognition.configuration.schema import EvaluationConfig
 from hand_gesture_recognition.evaluation.base import evaluate
+from hand_gesture_recognition.evaluation.grouped import evaluate_grouped
 from hand_gesture_recognition.prediction.base import Prediction
 
 
@@ -86,3 +87,27 @@ def test_evaluate_exclude_classes():
     # true noGesture samples dropped -> y_true=[1,1,2], y_pred=[1,2,2]
     assert res.metrics["accuracy"] == pytest.approx(2 / 3)
     assert "0" not in res.per_class  # noGesture excluded from per-class
+
+
+def test_evaluate_grouped_by_subject():
+    p = Prediction(
+        run_id="r",
+        sample_ids=np.array(["a0", "a1", "b0"]),
+        subject_ids=np.array(["A", "A", "B"]),
+        trial_ids=np.array(["a", "a", "b"]),
+        y_true=np.array([0, 0, 1]),
+        y_pred=np.array([0, 1, 1]),
+        y_score=None,
+        prediction_duration_s=0.0,
+        backend="classical",
+    )
+    out = evaluate_grouped(
+        p,
+        by="subject_id",
+        config=EvaluationConfig(),
+        dataset_id="d",
+        class_names=["c0", "c1"],
+    )
+    assert set(out) == {"A", "B"}
+    assert out["A"].metrics["accuracy"] == 0.5
+    assert out["B"].metrics["accuracy"] == 1.0
