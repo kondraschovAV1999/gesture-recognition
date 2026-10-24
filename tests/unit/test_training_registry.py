@@ -1,4 +1,4 @@
-from hand_gesture_recognition.training.base import (
+from hand_gesture_recognition.pipeline.models.base import (
     TrainingStrategy,
     get_training_strategy,
     register_training,

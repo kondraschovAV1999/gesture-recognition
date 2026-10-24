@@ -1,6 +1,6 @@
 import json
 
-from hand_gesture_recognition.data.loaders.epn612 import EPN612Loader
+from hand_gesture_recognition.pipeline.data_loaders.epn612 import EPN612Loader
 
 
 def _write_user(root, subdir, user_id, n_samples=3, length=50, testing_labeled=None):

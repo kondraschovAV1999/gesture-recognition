@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import FrequencyDomainFeatures
 
 
 def test_output_shape_per_channel():

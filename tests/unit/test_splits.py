@@ -8,11 +8,11 @@ from hand_gesture_recognition.data.datasets.base import (
     Trial,
 )
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
-from hand_gesture_recognition.data.splits.base import (
+from hand_gesture_recognition.pipeline.splits.base import (
     assert_no_group_leakage,
     split_dataset,
 )
-from hand_gesture_recognition.data.splits.strategy import get_split_strategy
+from hand_gesture_recognition.pipeline.splits.strategy import get_split_strategy
 
 
 def test_group_wise_split_has_no_leakage():

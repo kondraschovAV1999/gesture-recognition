@@ -1,30 +1,31 @@
 # @package neural
 datamodule:
-  _target_: hand_gesture_recognition.neural.datamodules.emg.EMGDataModule
+  _target_: hand_gesture_recognition.pipeline.models.neural.datamodule.EMGDataModule
   batch_size: 32
   num_workers: 0
   shuffle: false
 model:
-  _target_: hand_gesture_recognition.neural.models.cnn_lstm.CNNLSTMModule
+  _target_: hand_gesture_recognition.pipeline.models.neural.cnn_lstm.CNNLSTMModule
   conv_filters: [64, 128]
   kernel_size: 3
   hidden_size: 64
   num_layers: 1
 optimizer:
   _target_: torch.optim.Adam   # or torch.optim.SGD / AdamW / RMSprop
-  lr: 0.001
+  lr: 0.0001
   weight_decay: 0.0
 # Optional early stopping. Enable by replacing `null` with, e.g.:
-#   _target_: lightning.pytorch.callbacks.EarlyStopping
-#   monitor: val_loss
-#   patience: 5
-#   mode: min
-early_stopping: null
+
+early_stopping:
+   _target_: lightning.pytorch.callbacks.EarlyStopping
+   monitor: val_loss
+   patience: 5
+   mode: min
 trainer:
   _target_: lightning.pytorch.Trainer
-  max_epochs: 5
+  max_epochs: 100
   accelerator: auto
-  enable_progress_bar: false
-  enable_model_summary: false
+  enable_progress_bar: true
+  enable_model_summary: true
   enable_checkpointing: false
   logger: false

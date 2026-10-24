@@ -11,21 +11,21 @@ from hand_gesture_recognition.configuration.schema import (
     WindowingConfig,
 )
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
-from hand_gesture_recognition.data.splits.base import split_dataset
-from hand_gesture_recognition.evaluation.base import evaluate
+from hand_gesture_recognition.pipeline.splits.base import split_dataset
+from hand_gesture_recognition.pipeline.evaluation.base import evaluate
 
 
 def _classical_prediction(split, windowing):
-    from hand_gesture_recognition.classical.adapters.sklearn import (
+    from hand_gesture_recognition.pipeline.models.classical.adapter import (
         SklearnPredictionAdapter,
     )
-    from hand_gesture_recognition.classical.models.random_forest import (
+    from hand_gesture_recognition.pipeline.models.classical.random_forest import (
         RandomForestEstimator,
     )
-    from hand_gesture_recognition.classical.pipelines.windowing import (
+    from hand_gesture_recognition.pipeline.models.classical.windowing import (
         WindowingTransformer,
     )
-    from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
+    from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
 
     windower = WindowingTransformer(windowing)
     train_wd = windower.fit_transform(split.train)
@@ -47,15 +47,15 @@ def _classical_prediction(split, windowing):
 def _neural_prediction(split, windowing):
     import lightning.pytorch as pl
 
-    from hand_gesture_recognition.data.windowing.base import (
+    from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
         WindowedPartitions,
         window_dataset,
     )
-    from hand_gesture_recognition.neural.adapters.lightning import (
+    from hand_gesture_recognition.pipeline.models.neural.adapter import (
         LightningPredictionAdapter,
     )
-    from hand_gesture_recognition.neural.datamodules.emg import EMGDataModule
-    from hand_gesture_recognition.neural.models.dnn import DNNModule
+    from hand_gesture_recognition.pipeline.models.neural.datamodule import EMGDataModule
+    from hand_gesture_recognition.pipeline.models.neural.dnn import DNNModule
 
     pl.seed_everything(0, workers=True)
     n_channels = len(split.train.metadata.channels)

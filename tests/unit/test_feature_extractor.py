@@ -1,7 +1,7 @@
 import numpy as np
 
-from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
-from hand_gesture_recognition.training.features import FeatureExtractor
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
+from hand_gesture_recognition.pipeline.feature_extraction.features import FeatureExtractor
 
 
 class DoublingStub:
@@ -31,7 +31,7 @@ def test_single_extractor_shape():
     fe = FeatureExtractor(
         [
             {
-                "_target_": "hand_gesture_recognition.features.time_domain.TimeDomainFeatures"
+                "_target_": "hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain.TimeDomainFeatures"
             }
         ]
     )
@@ -49,7 +49,7 @@ def test_two_extractors_concatenate_along_axis1():
     fe = FeatureExtractor(
         [
             {
-                "_target_": "hand_gesture_recognition.features.time_domain.TimeDomainFeatures"
+                "_target_": "hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain.TimeDomainFeatures"
             },
             {"_target_": __name__ + ".DoublingStub"},
         ]
@@ -73,7 +73,7 @@ def test_transform_windows():
     fe = FeatureExtractor(
         [
             {
-                "_target_": "hand_gesture_recognition.features.time_domain.TimeDomainFeatures"
+                "_target_": "hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain.TimeDomainFeatures"
             }
         ]
     )

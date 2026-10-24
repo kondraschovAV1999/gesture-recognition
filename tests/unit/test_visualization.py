@@ -9,8 +9,8 @@ from hand_gesture_recognition.configuration.schema import (
     VisualizationSelectionConfig,
     WindowingConfig,
 )
-from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
-from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import FrequencyDomainFeatures
 from hand_gesture_recognition.reporting.visualization import (
     compute_stages,
     plot_feature_over_windows,
@@ -153,7 +153,7 @@ def test_stage_label_and_compute_stages_order():
         seed=0,
     )
     steps = [
-        {"_target_": "hand_gesture_recognition.preprocessing.signal.RectifyTransformer"}
+        {"_target_": "hand_gesture_recognition.pipeline.preprocessing.signal.RectifyTransformer"}
     ]
     stages = compute_stages(ds, steps, None)
     labels = [s[0] for s in stages]
@@ -173,7 +173,7 @@ def test_plot_stage_progression_grid(tmp_path, monkeypatch):
         seed=0,
     )
     steps = [
-        {"_target_": "hand_gesture_recognition.preprocessing.signal.RectifyTransformer"}
+        {"_target_": "hand_gesture_recognition.pipeline.preprocessing.signal.RectifyTransformer"}
     ]
     stages = compute_stages(ds, steps, None)  # [("raw", ds), ("rectified", ds)]
     selection = {"class_0": [0, 1]}
@@ -284,10 +284,10 @@ def test_plot_raw_signal_by_class_maps_original_labels(monkeypatch, tmp_path):
 
 import numpy as np
 
-from hand_gesture_recognition.classical.adapters.sklearn import (
+from hand_gesture_recognition.pipeline.models.classical.adapter import (
     SklearnPredictionAdapter,
 )
-from hand_gesture_recognition.data.windowing.gesture import window_gestures
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.gesture import window_gestures
 from hand_gesture_recognition.reporting.visualization import (
     plot_predictions_on_signal,
     plot_signal_data_flow,

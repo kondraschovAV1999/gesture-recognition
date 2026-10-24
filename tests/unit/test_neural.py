@@ -4,24 +4,24 @@ import torch
 
 from hand_gesture_recognition.configuration.schema import SplitConfig, WindowingConfig
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
-from hand_gesture_recognition.data.splits.base import split_dataset
-from hand_gesture_recognition.data.windowing.base import (
+from hand_gesture_recognition.pipeline.splits.base import split_dataset
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
     WindowedPartitions,
     WindowMetadata,
     WindowedDataset,
     window_dataset,
 )
-from hand_gesture_recognition.neural.adapters.lightning import (
+from hand_gesture_recognition.pipeline.models.neural.adapter import (
     LightningPredictionAdapter,
 )
-from hand_gesture_recognition.neural.datamodules.emg import (
+from hand_gesture_recognition.pipeline.models.neural.datamodule import (
     EMGDataModule,
     EMGWindowDataset,
 )
-from hand_gesture_recognition.neural.models.dnn import DNNModule
-from hand_gesture_recognition.neural.models.lstm import LSTMModule
-from hand_gesture_recognition.neural.models.cnn import CNNModule
-from hand_gesture_recognition.neural.models.cnn_lstm import CNNLSTMModule
+from hand_gesture_recognition.pipeline.models.neural.dnn import DNNModule
+from hand_gesture_recognition.pipeline.models.neural.lstm import LSTMModule
+from hand_gesture_recognition.pipeline.models.neural.cnn import CNNModule
+from hand_gesture_recognition.pipeline.models.neural.cnn_lstm import CNNLSTMModule
 
 
 def _windowed_partitions():

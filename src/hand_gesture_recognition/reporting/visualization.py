@@ -13,10 +13,10 @@ from hydra.utils import instantiate
 
 from hand_gesture_recognition.configuration.schema import VisualizationSelectionConfig
 from hand_gesture_recognition.data.datasets.base import Dataset
-from hand_gesture_recognition.data.windowing.strategy import get_windowing_strategy
-from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
-from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
-from hand_gesture_recognition.prediction.base import Prediction
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import get_windowing_strategy
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import FrequencyDomainFeatures
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
+from hand_gesture_recognition.pipeline.evaluation.prediction import Prediction
 
 
 def _channel_axes(n_channels: int):

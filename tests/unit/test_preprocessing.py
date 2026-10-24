@@ -8,15 +8,15 @@ from hand_gesture_recognition.data.datasets.base import (
     Trial,
     User,
 )
-from hand_gesture_recognition.data.gesture_crop import crop_to_gesture
-from hand_gesture_recognition.data.splits.base import DataSplit
-from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
-from hand_gesture_recognition.preprocessing.learned import PerChannelStandardScaler
-from hand_gesture_recognition.preprocessing.pipeline import (
+from hand_gesture_recognition.pipeline.preprocessing.gesture_crop import crop_to_gesture
+from hand_gesture_recognition.pipeline.splits.base import DataSplit
+from hand_gesture_recognition.pipeline.preprocessing.baseline import BaselineRemoval
+from hand_gesture_recognition.pipeline.preprocessing.learned import PerChannelStandardScaler
+from hand_gesture_recognition.pipeline.preprocessing.pipeline import (
     GestureCropStep,
     PreprocessingPipeline,
 )
-from hand_gesture_recognition.preprocessing.signal import (
+from hand_gesture_recognition.pipeline.preprocessing.signal import (
     ButterworthFilter,
     EnvelopeExtractor,
     RectifyTransformer,

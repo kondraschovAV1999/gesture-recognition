@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 
 from hand_gesture_recognition.configuration.schema import EvaluationConfig
-from hand_gesture_recognition.evaluation.base import evaluate
-from hand_gesture_recognition.evaluation.grouped import evaluate_grouped
-from hand_gesture_recognition.prediction.base import Prediction
+from hand_gesture_recognition.pipeline.evaluation.base import evaluate
+from hand_gesture_recognition.pipeline.evaluation.grouped import evaluate_grouped
+from hand_gesture_recognition.pipeline.evaluation.prediction import Prediction
 
 
 def _pred():

@@ -9,7 +9,7 @@ import numpy as np
 
 from hand_gesture_recognition.configuration.schema import ExperimentConfig
 from hand_gesture_recognition.data.datasets.base import Dataset
-from hand_gesture_recognition.evaluation.base import EvaluationResult
+from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult
 
 
 def render_report(

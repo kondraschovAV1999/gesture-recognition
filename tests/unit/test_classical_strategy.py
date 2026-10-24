@@ -1,16 +1,16 @@
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import ExperimentConfig
-from hand_gesture_recognition.data.windowing.base import (
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
     WindowMetadata,
     WindowedDataset,
     WindowedPartitions,
 )
-from hand_gesture_recognition.data.windowing.strategy import (
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import (
     GroupedWindowedDataset,
     GroupedWindowedPartitions,
 )
-from hand_gesture_recognition.training.classical import ClassicalTrainingStrategy
+from hand_gesture_recognition.pipeline.models.classical.strategy import ClassicalTrainingStrategy
 
 
 def _windowed(n, seed, window_size=8, n_channels=2):
@@ -31,7 +31,7 @@ def _cfg():
     cfg = ExperimentConfig(run_id="unit-test-run")
     cfg.classical.preprocessing = []
     cfg.classical.model = {
-        "_target_": "hand_gesture_recognition.classical.models.random_forest.RandomForestEstimator",
+        "_target_": "hand_gesture_recognition.pipeline.models.classical.random_forest.RandomForestEstimator",
         "n_estimators": 10,
         "random_state": 0,
     }

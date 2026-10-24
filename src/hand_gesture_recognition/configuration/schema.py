@@ -136,7 +136,7 @@ class DatasetConfig:
     include_no_gesture: bool = True
     loader: Dict[str, Any] = field(
         default_factory=lambda: {
-            "_target_": "hand_gesture_recognition.data.loaders.epn612.EPN612Loader"
+            "_target_": "hand_gesture_recognition.pipeline.data_loaders.epn612.EPN612Loader"
         }
     )
 
@@ -225,13 +225,13 @@ class VisualizationConfig:
 _FEATURE_TYPES = ("time_domain", "frequency_domain", "combined", "custom")
 
 _TIME_DOMAIN_FEATURE = {
-    "_target_": "hand_gesture_recognition.features.time_domain.TimeDomainFeatures",
+    "_target_": "hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain.TimeDomainFeatures",
 }
 
 
 def _frequency_domain_feature(sampling_rate: float) -> Dict[str, Any]:
     return {
-        "_target_": "hand_gesture_recognition.features.frequency_domain.FrequencyDomainFeatures",
+        "_target_": "hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain.FrequencyDomainFeatures",
         "sampling_rate": sampling_rate,
         "use_hann": True,
         "remove_dc": True,
@@ -283,7 +283,7 @@ class ClassicalConfig:
     preprocessing: List[Dict[str, Any]] = field(default_factory=list)
     model: Dict[str, Any] = field(
         default_factory=lambda: {
-            "_target_": "hand_gesture_recognition.classical.models.random_forest.RandomForestEstimator",
+            "_target_": "hand_gesture_recognition.pipeline.models.classical.random_forest.RandomForestEstimator",
             "n_estimators": 100,
             "random_state": 42,
         }
@@ -294,14 +294,14 @@ class ClassicalConfig:
 class NeuralConfig:
     datamodule: Dict[str, Any] = field(
         default_factory=lambda: {
-            "_target_": "hand_gesture_recognition.neural.datamodules.emg.EMGDataModule",
+            "_target_": "hand_gesture_recognition.pipeline.models.neural.datamodule.EMGDataModule",
             "batch_size": 32,
             "num_workers": 0,
         }
     )
     model: Dict[str, Any] = field(
         default_factory=lambda: {
-            "_target_": "hand_gesture_recognition.neural.models.dnn.DNNModule",
+            "_target_": "hand_gesture_recognition.pipeline.models.neural.dnn.DNNModule",
             "hidden_dims": [128, 64],
         }
     )

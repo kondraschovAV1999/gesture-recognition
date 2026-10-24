@@ -1,12 +1,12 @@
 defaults:
   - dataset: epn612
-  - windowing: default
+  - windowing: two_level
   - signal_processing: emg
-  - gesture_crop: default
-  - baseline: none
+  - gesture_crop: none
+  - baseline: per_user
   - classical: random_forest
   - feature_extraction: default
-  - neural: lstm
+  - neural: cnn_lstm
   - evaluation: basic
   - analytics: basic
   - cv: none
@@ -29,8 +29,8 @@ task:
 
 # split (inlined from configs/split/subject_wise.yaml)
 split:
-  strategy: group_wise
-  split_on: subject_ids
+  strategy: trial_wise
+  split_on: trial_ids
   train_ratio: 0.6
   val_ratio: 0.2
   test_ratio: 0.2

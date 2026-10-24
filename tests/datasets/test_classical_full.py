@@ -6,23 +6,23 @@ import os
 
 import pytest
 
-from hand_gesture_recognition.classical.adapters.sklearn import SklearnPredictionAdapter
-from hand_gesture_recognition.classical.models.random_forest import (
+from hand_gesture_recognition.pipeline.models.classical.adapter import SklearnPredictionAdapter
+from hand_gesture_recognition.pipeline.models.classical.random_forest import (
     RandomForestEstimator,
 )
-from hand_gesture_recognition.classical.pipelines.windowing import WindowingTransformer
+from hand_gesture_recognition.pipeline.models.classical.windowing import WindowingTransformer
 from hand_gesture_recognition.configuration.schema import (
     EvaluationConfig,
     SplitConfig,
     WindowingConfig,
 )
-from hand_gesture_recognition.data.loaders.epn612 import EPN612Loader
-from hand_gesture_recognition.data.splits.base import (
+from hand_gesture_recognition.pipeline.data_loaders.epn612 import EPN612Loader
+from hand_gesture_recognition.pipeline.splits.base import (
     assert_no_group_leakage,
     split_dataset,
 )
-from hand_gesture_recognition.evaluation.base import evaluate
-from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
+from hand_gesture_recognition.pipeline.evaluation.base import evaluate
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
 from hand_gesture_recognition.paths import resolve_path
 
 DATA_PATH = resolve_path("resources/data/EPN612")

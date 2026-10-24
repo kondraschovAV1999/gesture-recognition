@@ -7,7 +7,7 @@ from hand_gesture_recognition.data.datasets.base import (
     Trial,
     User,
 )
-from hand_gesture_recognition.data.windowing.base import window_dataset
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import window_dataset
 
 
 def _ds(lengths=(100, 100)):

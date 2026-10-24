@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from hand_gesture_recognition.data.datasets.base import Dataset, DatasetMetadata, Trial
-from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
+from hand_gesture_recognition.pipeline.preprocessing.baseline import BaselineRemoval
 
 
 def _metadata():

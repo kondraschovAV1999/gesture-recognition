@@ -23,23 +23,25 @@ from hydra.utils import instantiate
 
 from hand_gesture_recognition.configuration.loader import save_resolved_config
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
-from hand_gesture_recognition.data.splits.base import (
+from hand_gesture_recognition.pipeline.splits.base import (
     DataSplit,
     assert_no_group_leakage,
 )
-from hand_gesture_recognition.data.splits.strategy import (
+from hand_gesture_recognition.pipeline.splits.strategy import (
     get_cv_strategy,
     get_split_strategy,
 )
-from hand_gesture_recognition.data.windowing.base import WindowedPartitions
-from hand_gesture_recognition.data.windowing.strategy import (
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
+    WindowedPartitions,
+)
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import (
     GroupedWindowedPartitions,
     get_windowing_strategy,
 )
-from hand_gesture_recognition.evaluation.aggregate import aggregate_folds
-from hand_gesture_recognition.evaluation.base import EvaluationResult, evaluate
+from hand_gesture_recognition.pipeline.evaluation.aggregate import aggregate_folds
+from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult, evaluate
 from hand_gesture_recognition.paths import resolve_path
-from hand_gesture_recognition.preprocessing.pipeline import (
+from hand_gesture_recognition.pipeline.preprocessing.pipeline import (
     GestureCropStep,
     PreprocessingPipeline,
 )
@@ -52,8 +54,13 @@ from hand_gesture_recognition.tracing.stage import stage
 
 # Import the concrete training strategies so their registry decorators run
 # before ``get_training_strategy`` is called in ``Pipeline.__init__``.
-from hand_gesture_recognition.training import classical, neural  # noqa: F401
-from hand_gesture_recognition.training.base import get_training_strategy
+from hand_gesture_recognition.pipeline.models.classical.strategy import (  # noqa: F401
+    ClassicalTrainingStrategy,
+)
+from hand_gesture_recognition.pipeline.models.neural.strategy import (  # noqa: F401
+    NeuralTrainingStrategy,
+)
+from hand_gesture_recognition.pipeline.models.base import get_training_strategy
 
 __all__ = ["Pipeline", "PipelineBuilder"]
 
@@ -126,7 +133,9 @@ class Pipeline:
 
         post_steps = []
         if cfg.baseline.enabled:
-            from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
+            from hand_gesture_recognition.pipeline.preprocessing.baseline import (
+                BaselineRemoval,
+            )
 
             post_steps.append(BaselineRemoval(mode=cfg.baseline.mode))
         if cfg.windowing.mode != "two_level":
@@ -160,7 +169,9 @@ class Pipeline:
         # _run_partition). Fitted only when visualization needs it.
         viz_baseline = None
         if cfg.baseline.enabled and cfg.visualization.enabled:
-            from hand_gesture_recognition.preprocessing.baseline import BaselineRemoval
+            from hand_gesture_recognition.pipeline.preprocessing.baseline import (
+                BaselineRemoval,
+            )
 
             viz_baseline = BaselineRemoval(mode=cfg.baseline.mode).fit(cropped)
 
@@ -329,7 +340,9 @@ class Pipeline:
         logged under ``{metric}_{group}`` (e.g. ``accuracy_s01``) via the tracker.
         Non-breaking: this only logs; the returned ``result`` is unchanged.
         """
-        from hand_gesture_recognition.evaluation.grouped import evaluate_grouped
+        from hand_gesture_recognition.pipeline.evaluation.grouped import (
+            evaluate_grouped,
+        )
 
         for by in self.cfg.evaluation.breakdown_by:
             for part in ("val", "test"):

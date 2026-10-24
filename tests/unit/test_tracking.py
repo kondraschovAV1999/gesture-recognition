@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from hand_gesture_recognition.configuration.schema import TrackingConfig
-from hand_gesture_recognition.evaluation.base import EvaluationResult
+from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult
 from hand_gesture_recognition.tracking.mlflow_tracker import MlflowTracker
 
 

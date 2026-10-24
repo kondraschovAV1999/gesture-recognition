@@ -6,7 +6,7 @@ from hand_gesture_recognition.data.datasets.base import (
     DatasetMetadata,
     Trial,
 )
-from hand_gesture_recognition.data.gesture_crop import crop_to_gesture
+from hand_gesture_recognition.pipeline.preprocessing.gesture_crop import crop_to_gesture
 
 
 def _metadata():
@@ -114,7 +114,7 @@ def test_crop_preserves_labels_and_ids():
 
 
 def test_crop_shifts_bounds():
-    from hand_gesture_recognition.data.gesture_crop import crop_to_gesture
+    from hand_gesture_recognition.pipeline.preprocessing.gesture_crop import crop_to_gesture
     from hand_gesture_recognition.configuration.schema import GestureCropConfig
     import numpy as np
     from hand_gesture_recognition.data.datasets.base import (

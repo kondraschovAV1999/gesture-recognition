@@ -1,12 +1,12 @@
 # @package signal_processing
-- _target_: hand_gesture_recognition.preprocessing.signal.ButterworthFilter
-  type: bandpass
+- _target_: hand_gesture_recognition.pipeline.preprocessing.signal.ButterworthFilter
+  type: highpass
   lowcut: 10
   highcut: 95
   order: 5
   fs: 200
-- _target_: hand_gesture_recognition.preprocessing.signal.ButterworthFilter
+- _target_: hand_gesture_recognition.pipeline.preprocessing.signal.ButterworthFilter
   type: notch
   frequency: 60
   fs: 200
-- _target_: hand_gesture_recognition.preprocessing.signal.RectifyTransformer
+- _target_: hand_gesture_recognition.pipeline.preprocessing.signal.RectifyTransformer

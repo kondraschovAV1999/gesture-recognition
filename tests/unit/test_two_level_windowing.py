@@ -7,7 +7,7 @@ from hand_gesture_recognition.data.datasets.base import (
     Trial,
     User,
 )
-from hand_gesture_recognition.data.windowing.strategy import (
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import (
     GroupedWindowedPartitions,
     get_windowing_strategy,
 )

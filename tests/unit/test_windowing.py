@@ -7,7 +7,7 @@ from hand_gesture_recognition.data.datasets.base import (
     Trial,
     User,
 )
-from hand_gesture_recognition.data.windowing.base import window_dataset, window_emg
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import window_dataset, window_emg
 
 
 def _cfg(ws, stride):

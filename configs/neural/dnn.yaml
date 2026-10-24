@@ -1,11 +1,11 @@
 # @package neural
 datamodule:
-  _target_: hand_gesture_recognition.neural.datamodules.emg.EMGDataModule
+  _target_: hand_gesture_recognition.pipeline.models.neural.datamodule.EMGDataModule
   batch_size: 32
   num_workers: 0
   shuffle: false
 model:
-  _target_: hand_gesture_recognition.neural.models.dnn.DNNModule
+  _target_: hand_gesture_recognition.pipeline.models.neural.dnn.DNNModule
   hidden_dims: [128, 64]
 optimizer:
   _target_: torch.optim.Adam   # or torch.optim.SGD / AdamW / RMSprop

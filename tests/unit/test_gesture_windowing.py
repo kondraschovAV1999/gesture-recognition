@@ -7,7 +7,7 @@ from hand_gesture_recognition.data.datasets.base import (
     Trial,
     User,
 )
-from hand_gesture_recognition.data.windowing.gesture import window_gestures
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.gesture import window_gestures
 
 
 def _metadata():
@@ -121,7 +121,7 @@ def test_all_rest_trials_returns_empty_dataset():
     assert wd.y.shape == (0,)
 
 
-from hand_gesture_recognition.data.windowing.strategy import get_windowing_strategy
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import get_windowing_strategy
 
 
 def test_strategy_routes_by_name():

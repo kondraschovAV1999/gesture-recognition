@@ -2,14 +2,14 @@ import numpy as np
 import pytest
 from sklearn.pipeline import Pipeline
 
-from hand_gesture_recognition.classical.models.random_forest import (
+from hand_gesture_recognition.pipeline.models.classical.random_forest import (
     RandomForestEstimator,
 )
-from hand_gesture_recognition.classical.pipelines.windowing import WindowingTransformer
+from hand_gesture_recognition.pipeline.models.classical.windowing import WindowingTransformer
 from hand_gesture_recognition.configuration.schema import WindowingConfig
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
-from hand_gesture_recognition.features.time_domain import TimeDomainFeatures
-from hand_gesture_recognition.features.frequency_domain import FrequencyDomainFeatures
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import FrequencyDomainFeatures
 
 
 def test_windowing_transformer_calls_shared_windowing():

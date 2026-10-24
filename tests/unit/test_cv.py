@@ -3,15 +3,15 @@ from hand_gesture_recognition.configuration.schema import (
     SplitConfig,
 )
 from hand_gesture_recognition.data.fixtures import make_synthetic_dataset
-from hand_gesture_recognition.data.splits.base import assert_no_group_leakage
-from hand_gesture_recognition.data.splits.folds import generate_folds
-from hand_gesture_recognition.data.splits.strategy import (
+from hand_gesture_recognition.pipeline.splits.base import assert_no_group_leakage
+from hand_gesture_recognition.pipeline.splits.folds import generate_folds
+from hand_gesture_recognition.pipeline.splits.strategy import (
     KFoldCVStrategy,
     LosoCVStrategy,
     get_cv_strategy,
 )
-from hand_gesture_recognition.evaluation.aggregate import aggregate_folds
-from hand_gesture_recognition.evaluation.base import EvaluationResult
+from hand_gesture_recognition.pipeline.evaluation.aggregate import aggregate_folds
+from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult
 
 
 def test_cv_strategy_registry_returns_correct_types():
