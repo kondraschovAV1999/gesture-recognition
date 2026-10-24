@@ -11,6 +11,8 @@ import numpy as np
 class Prediction:
     run_id: str
     sample_ids: np.ndarray
+    subject_ids: np.ndarray
+    trial_ids: np.ndarray
     y_true: np.ndarray
     y_pred: np.ndarray
     y_score: Optional[np.ndarray]

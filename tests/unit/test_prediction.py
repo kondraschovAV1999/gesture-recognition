@@ -32,6 +32,8 @@ def test_sklearn_adapter_builds_prediction():
     assert pred.backend == "classical"
     assert pred.run_id == "r1"
     assert pred.sample_ids.tolist() == [f"s{i % 2}_t{i}_window0" for i in range(10)]
+    assert pred.subject_ids.tolist() == [f"s{i % 2}" for i in range(10)]
+    assert pred.trial_ids.tolist() == [f"t{i}" for i in range(10)]
     assert pred.y_true.tolist() == (np.arange(10) % 3).tolist()
     assert pred.y_score.shape == (10, 3)
 
@@ -41,6 +43,8 @@ def test_partition_predictions_dataclass():
         return Prediction(
             run_id="r",
             sample_ids=np.array([tag]),
+            subject_ids=np.array(["s0"]),
+            trial_ids=np.array(["t0"]),
             y_true=np.array([0]),
             y_pred=np.array([0]),
             y_score=np.array([[1.0]]),
