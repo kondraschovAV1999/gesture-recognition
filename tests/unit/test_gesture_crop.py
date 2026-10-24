@@ -135,20 +135,41 @@ def test_crop_shifts_bounds():
     assert (t.start, t.end) == (10, 30)
 
 
-from hand_gesture_recognition.configuration.loader import load_config
+from hand_gesture_recognition.configuration.schema import (
+    ExperimentConfig,
+    TaskConfig,
+    TrackingConfig,
+)
 from hand_gesture_recognition.runner.run import ExperimentRunner
 
 
+def _runner(tmp_path, task_name: str, crop_enabled: bool) -> ExperimentRunner:
+    cfg = ExperimentConfig(
+        task=TaskConfig(name=task_name),
+        gesture_crop=GestureCropConfig(enabled=crop_enabled, pad_samples=100),
+        tracking=TrackingConfig(tracking_uri=str(tmp_path / "mlruns")),
+    )
+    return ExperimentRunner(cfg)
+
+
 def test_runner_gesture_crop_respects_flag(tmp_path):
-    cfg = load_config(mode="compose", overrides=["dataset.name=synthetic"])
-    cfg.tracking.tracking_uri = str(tmp_path / "mlruns")
-    runner = ExperimentRunner(cfg)
     ds = _dataset()
 
-    cfg.gesture_crop.enabled = False
-    assert runner._gesture_crop(ds) is ds
-
-    cfg.gesture_crop.enabled = True
-    cfg.gesture_crop.pad_samples = 100  # explicit, independent of the config default
-    cropped = runner._gesture_crop(ds)
+    # recognition + enabled -> pre-split pipeline crops the gesture trial
+    cropped = (
+        _runner(tmp_path, "recognition", True)
+        ._build_preprocessing()
+        .transform_dataset(ds)
+    )
     assert cropped.trials[0].emg.shape[0] == 300
+    assert (cropped.trials[0].start, cropped.trials[0].end) == (100, 200)
+
+    # recognition + disabled -> no crop step, identity transform
+    pipeline = _runner(tmp_path, "recognition", False)._build_preprocessing()
+    assert pipeline.pre_steps == []
+    assert pipeline.transform_dataset(ds) is ds
+
+    # classification + enabled -> crop is recognition-only, so no crop step
+    pipeline = _runner(tmp_path, "classification", True)._build_preprocessing()
+    assert pipeline.pre_steps == []
+    assert pipeline.transform_dataset(ds) is ds
