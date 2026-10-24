@@ -73,26 +73,44 @@ def test_per_channel_scaler_uses_train_stats_only():
     assert np.allclose(out_train.mean(axis=(0, 1)), 0.0, atol=1e-5)
 
 
-def _ds(values):
-    meta = DatasetMetadata("x", "0", 200.0, ["c"], ["noGesture", "fist"], "h")
-    rest = User(
-        "u1", [Trial("t0", "u1", "noGesture", -1, -1, np.full((4, 1), 5.0, np.float32))]
-    )
-    gest = User(
-        "u1", [Trial("t1", "u1", "fist", 0, 4, np.full((4, 1), 10.0, np.float32))]
-    )
-    return Dataset(meta, [rest, gest])
-
-
 def test_pipeline_fits_baseline_on_train_then_rectifies():
-    train = _ds(10.0)
-    val = _ds(10.0)
+    meta = DatasetMetadata("x", "0", 200.0, ["c"], ["noGesture", "fist"], "h")
+
+    def trial(trial_id, gesture_name, start, end, level):
+        return Trial(
+            trial_id, "u1", gesture_name, start, end, np.full((4, 1), level, np.float32)
+        )
+
+    # Train: rest level 5, gesture level 10.
+    train = Dataset(
+        meta,
+        [
+            User("u1", [trial("t0", "noGesture", -1, -1, 5.0)]),
+            User("u1", [trial("t1", "fist", 0, 4, 10.0)]),
+        ],
+    )
+    # Val: a DIFFERENT rest level (20) so that fitting the global baseline on
+    # train's rest (5) vs. val's rest (20) is distinguishable.
+    val = Dataset(meta, [User("u1", [trial("v0", "noGesture", -1, -1, 20.0)])])
     split = DataSplit(train=train, val=val, test=val)
+
     p = PreprocessingPipeline(
         pre_steps=[], post_steps=[BaselineRemoval(mode="global"), RectifyTransformer()]
     )
     p.fit(split)
     out = p.transform(split)
-    # rest level 5 subtracted from all trials, then rectified to >= 0
-    assert np.all(out.train.trials[1].emg >= 0.0)
-    assert np.all(out.val.trials[0].emg >= 0.0)
+
+    # Global baseline = mean of TRAIN's rest trials = 5.0 (not val's 20.0).
+    assert np.allclose(
+        out.train.trials[1].emg, 5.0
+    )  # gesture: 10 - 5, rectified unchanged
+    assert np.allclose(out.train.trials[0].emg, 0.0)  # rest: 5 - 5
+    assert np.allclose(out.val.trials[0].emg, 15.0)  # val rest: 20 - 5 (train baseline)
+    # Every partition/trial is rectified to be non-negative.
+    for arr in (
+        out.train.trials[0].emg,
+        out.train.trials[1].emg,
+        out.val.trials[0].emg,
+        out.test.trials[0].emg,
+    ):
+        assert np.all(arr >= 0.0)

@@ -31,12 +31,23 @@ def _apply(step, dataset: Dataset) -> Dataset:
 class PreprocessingPipeline:
     """Ordered fit/transform preprocessing (the Template Method seam).
 
-    Steps run in order and are split into two stages:
+    The pipeline has two distinct stages that are invoked at **different
+    orchestration points** and are **not chained** inside ``transform``:
 
-    - ``pre_steps``: whole-dataset transforms applied once, with no fit
-      (e.g. gesture crop). Always dataset-level.
-    - ``post_steps``: per-partition transforms. Stateful steps are fit on the
-      **train partition only** (fit-on-train), then applied to train/val/test.
+    - ``pre_steps``: **pre-split** whole-dataset transforms applied once, with
+      no fit (e.g. gesture crop). These run on a :class:`Dataset` *before* it is
+      split into train/val/test, via :meth:`transform_dataset`.
+
+    - ``post_steps``: **post-split** transforms applied to a :class:`DataSplit`.
+      Stateful (dataset-level) steps are fit on the **train partition only**
+      (fit-on-train) and then applied to train/val/test, via :meth:`fit` +
+      :meth:`transform`.
+
+    :meth:`transform` applies **only** ``post_steps`` — it never runs
+    ``pre_steps``. ``fit(split)`` followed by ``transform(split)`` therefore
+    does **not** apply ``pre_steps``; the two stages are applied at separate
+    points in the orchestration (``transform_dataset`` for the pre-split stage,
+    ``fit`` + ``transform`` for the post-split stage).
 
     Each step is either *dataset-level* (``dataset_level = True``; ``fit`` and
     ``transform`` take/return a :class:`Dataset`, e.g. ``BaselineRemoval``) or a
@@ -54,14 +65,23 @@ class PreprocessingPipeline:
         self.post_steps = list(post_steps or [])
 
     def fit(self, split: DataSplit) -> "PreprocessingPipeline":
-        """Fit stateful (dataset-level) post-steps on the train partition only."""
+        """Fit stateful (dataset-level) post-steps on the train partition only.
+
+        Only ``post_steps`` participate in fitting. ``pre_steps`` are stateless
+        and are applied later, at a separate pre-split point, via
+        :meth:`transform_dataset`.
+        """
         for step in self.post_steps:
             if _is_dataset_level(step):
                 step.fit(split.train)
         return self
 
     def transform(self, split: DataSplit) -> DataSplit:
-        """Apply fitted post-steps to every partition (fit-on-train only)."""
+        """Apply the fitted ``post_steps`` to every partition (fit-on-train only).
+
+        Applies ``post_steps`` **only**. ``pre_steps`` are *not* applied here —
+        they run at a separate pre-split point via :meth:`transform_dataset`.
+        """
         return DataSplit(
             train=self._transform_post(split.train),
             val=self._transform_post(split.val),
@@ -69,13 +89,19 @@ class PreprocessingPipeline:
         )
 
     def transform_dataset(self, dataset: Dataset) -> Dataset:
-        """Apply the pre-steps (whole-dataset transforms) once."""
+        """Apply the ``pre_steps`` (pre-split, whole-dataset transforms) once.
+
+        Applies ``pre_steps`` **only**. ``post_steps`` are *not* applied here —
+        they run at a separate post-split point via :meth:`fit` +
+        :meth:`transform`.
+        """
         out = dataset
         for step in self.pre_steps:
             out = _apply(step, out)
         return out
 
     def _transform_post(self, dataset: Dataset) -> Dataset:
+        """Apply the ``post_steps`` to a single partition's :class:`Dataset`."""
         out = dataset
         for step in self.post_steps:
             out = _apply(step, out)
