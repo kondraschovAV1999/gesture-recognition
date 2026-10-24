@@ -135,29 +135,30 @@ def test_crop_shifts_bounds():
     assert (t.start, t.end) == (10, 30)
 
 
+from dataclasses import replace
+
 from hand_gesture_recognition.configuration.schema import (
     ExperimentConfig,
     TaskConfig,
-    TrackingConfig,
 )
-from hand_gesture_recognition.runner.run import ExperimentRunner
+from hand_gesture_recognition.runner.pipeline import Pipeline
 
 
-def _runner(tmp_path, task_name: str, crop_enabled: bool) -> ExperimentRunner:
-    cfg = ExperimentConfig(
+def _pipeline(tmp_path, task_name: str, crop_enabled: bool) -> Pipeline:
+    cfg = replace(
+        ExperimentConfig(),
         task=TaskConfig(name=task_name),
         gesture_crop=GestureCropConfig(enabled=crop_enabled, pad_samples=100),
-        tracking=TrackingConfig(tracking_uri=str(tmp_path / "mlruns")),
     )
-    return ExperimentRunner(cfg)
+    return Pipeline(cfg=cfg, logger=None, tracker=None, output_root=str(tmp_path))
 
 
-def test_runner_gesture_crop_respects_flag(tmp_path):
+def test_pipeline_gesture_crop_respects_flag(tmp_path):
     ds = _dataset()
 
     # recognition + enabled -> pre-split pipeline crops the gesture trial
     cropped = (
-        _runner(tmp_path, "recognition", True)
+        _pipeline(tmp_path, "recognition", True)
         ._build_preprocessing()
         .transform_dataset(ds)
     )
@@ -165,11 +166,11 @@ def test_runner_gesture_crop_respects_flag(tmp_path):
     assert (cropped.trials[0].start, cropped.trials[0].end) == (100, 200)
 
     # recognition + disabled -> no crop step, identity transform
-    pipeline = _runner(tmp_path, "recognition", False)._build_preprocessing()
+    pipeline = _pipeline(tmp_path, "recognition", False)._build_preprocessing()
     assert pipeline.pre_steps == []
     assert pipeline.transform_dataset(ds) is ds
 
     # classification + enabled -> crop is recognition-only, so no crop step
-    pipeline = _runner(tmp_path, "classification", True)._build_preprocessing()
+    pipeline = _pipeline(tmp_path, "classification", True)._build_preprocessing()
     assert pipeline.pre_steps == []
     assert pipeline.transform_dataset(ds) is ds
