@@ -13,6 +13,8 @@ def _pred():
     return Prediction(
         run_id="r1",
         sample_ids=np.arange(6),
+        subject_ids=np.array([""] * 6, dtype=object),
+        trial_ids=np.array([""] * 6, dtype=object),
         y_true=y_true,
         y_pred=y_pred,
         y_score=np.eye(3)[y_pred],
@@ -37,6 +39,8 @@ def test_evaluate_computes_per_class_metrics():
     pred = Prediction(
         run_id="r1",
         sample_ids=np.arange(6),
+        subject_ids=np.array([""] * 6, dtype=object),
+        trial_ids=np.array([""] * 6, dtype=object),
         y_true=y_true,
         y_pred=y_pred,
         y_score=np.eye(3)[y_pred],
@@ -72,6 +76,8 @@ def test_evaluate_exclude_classes():
     pred = Prediction(
         run_id="r1",
         sample_ids=np.arange(6),
+        subject_ids=np.array([""] * 6, dtype=object),
+        trial_ids=np.array([""] * 6, dtype=object),
         y_true=y_true,
         y_pred=y_pred,
         y_score=np.eye(3)[y_pred],
