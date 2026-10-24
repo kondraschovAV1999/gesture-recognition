@@ -3,9 +3,11 @@ from __future__ import annotations
 import os
 
 # Absolute path to the project (repo) root, derived from this file's location
-# under src/hand_gesture_recognition/. Robust regardless of the current
+# under src/hand_gesture_recognition/utils/. Robust regardless of the current
 # working directory.
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..")
+)
 
 
 def resolve_path(path: str) -> str:
