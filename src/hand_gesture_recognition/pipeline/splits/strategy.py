@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Tuple
 
 import numpy as np
-from sklearn.model_selection import GroupKFold, KFold
+from sklearn.model_selection import GroupKFold, GroupShuffleSplit, KFold
 
 from hand_gesture_recognition.configuration.schema import (
     CrossValidationConfig,
@@ -11,7 +11,10 @@ from hand_gesture_recognition.configuration.schema import (
 )
 from hand_gesture_recognition.configuration.schema import Dataset
 from hand_gesture_recognition.configuration.schema import DataSplit
-from hand_gesture_recognition.pipeline.splits.base import _subset, assert_no_group_leakage
+from hand_gesture_recognition.pipeline.splits.base import (
+    _subset,
+    assert_no_group_leakage,
+)
 
 _REGISTRY: dict = {}
 
@@ -79,32 +82,33 @@ class StratifiedSplit:
 
 class GroupWiseSplit:
     def split(self, dataset, config) -> DataSplit:
-        # Both strategies split on the group identity given by split_on
-        # (subject_ids by default). A true session-wise split needs a
-        # session-bearing field; for Phase-1 datasets without one (EPN612 /
-        # synthetic) this behaves like group_wise. Group counts guarantee
-        # >=1 group per partition whenever the dataset has >=3 groups.
-        rng = np.random.default_rng(config.seed)
+        config.validate()
         groups = (
             dataset.subject_ids
             if config.split_on == "subject_ids"
             else dataset.trial_ids
         )
-        unique = np.unique(groups)
-        rng.shuffle(unique)
-        n = len(unique)
-        n_val = max(1, int(round(n * config.val_ratio)))
-        n_test = max(1, int(round(n * config.test_ratio)))
-        n_train = max(1, n - n_val - n_test)
-        if n_train + n_val + n_test > n:  # ratios over-allocate for tiny n
-            n_val = max(1, (n - n_train) // 2)
-            n_test = n - n_train - n_val
-        train_g = unique[:n_train]
-        val_g = unique[n_train : n_train + n_val]
-        test_g = unique[n_train + n_val : n_train + n_val + n_test]
-        train_idx = np.where(np.isin(groups, train_g))[0]
-        val_idx = np.where(np.isin(groups, val_g))[0]
-        test_idx = np.where(np.isin(groups, test_g))[0]
+        n = dataset.n_trials
+        indices = np.arange(n)
+
+        # Reserve test groups first (group-wise, seeded).
+        test_splitter = GroupShuffleSplit(
+            n_splits=1, test_size=config.test_ratio, random_state=config.seed
+        )
+        train_val_idx, test_idx = next(test_splitter.split(indices, groups=groups))
+
+        # Then carve a validation subset (group-wise) out of the remaining train+val.
+        remaining_groups = groups[train_val_idx]
+        relative_val_ratio = config.val_ratio / (config.train_ratio + config.val_ratio)
+        val_splitter = GroupShuffleSplit(
+            n_splits=1, test_size=relative_val_ratio, random_state=config.seed
+        )
+        train_rel_idx, val_rel_idx = next(
+            val_splitter.split(train_val_idx, groups=remaining_groups)
+        )
+        train_idx = train_val_idx[train_rel_idx]
+        val_idx = train_val_idx[val_rel_idx]
+
         return DataSplit(
             train=_subset(dataset, train_idx),
             val=_subset(dataset, val_idx),
