@@ -2,14 +2,21 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-import numpy as np
 import torch
 from lightning.pytorch import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 
-from hand_gesture_recognition.configuration.schema import WindowedDataset, WindowedPartitions
-from hand_gesture_recognition.configuration.schema import GroupedWindowedDataset, GroupedWindowedPartitions
-from hand_gesture_recognition.pipeline.feature_extraction.features import FeatureExtractor
+from hand_gesture_recognition.configuration.schema import (
+    WindowedDataset,
+    WindowedPartitions,
+)
+from hand_gesture_recognition.configuration.schema import (
+    GroupedWindowedDataset,
+    GroupedWindowedPartitions,
+)
+from hand_gesture_recognition.pipeline.feature_extraction.features import (
+    FeatureExtractor,
+)
 
 
 class EMGWindowDataset(Dataset):
@@ -99,27 +106,15 @@ class GroupedEMGDataset(Dataset):
         self,
         grouped: GroupedWindowedDataset,
         feature_specs: List,
-        n_features: int,
         max_small_per_big: int,
     ):
         self.y_true = grouped.y
         self.window_ids = grouped.metadata.window_ids
         self.trial_ids = grouped.metadata.trial_ids
         self.subject_ids = grouped.metadata.subject_ids
-        features = FeatureExtractor(feature_specs)
-        self.sequences = []
-        for smalls in grouped.small_windows:
-            feats = features.transform(smalls).astype(
-                np.float32
-            )  # (n_small, n_features)
-            if feats.shape[0] > max_small_per_big:
-                feats = feats[:max_small_per_big]
-            elif feats.shape[0] < max_small_per_big:
-                pad = np.zeros(
-                    (max_small_per_big - feats.shape[0], n_features), dtype=np.float32
-                )
-                feats = np.vstack([feats, pad])
-            self.sequences.append(feats)
+        self.sequences = FeatureExtractor(feature_specs).transform_grouped(
+            grouped.small_windows, max_small_per_big
+        )
 
     def __len__(self):
         return len(self.sequences)
@@ -149,6 +144,8 @@ class GroupedEMGDataModule(LightningDataModule):
         super().__init__()
         self.windowed = windowed
         self.feature_specs = feature_specs
+        # unused: the feature width is now derived inside FeatureExtractor.
+        # Kept for backward-compatible construction by NeuralTrainingStrategy.
         self.n_features = n_features
         self.max_small_per_big = max_small_per_big
         self.batch_size = batch_size
@@ -161,19 +158,16 @@ class GroupedEMGDataModule(LightningDataModule):
         self._train = GroupedEMGDataset(
             self.windowed.train,
             self.feature_specs,
-            self.n_features,
             self.max_small_per_big,
         )
         self._val = GroupedEMGDataset(
             self.windowed.val,
             self.feature_specs,
-            self.n_features,
             self.max_small_per_big,
         )
         self._test = GroupedEMGDataset(
             self.windowed.test,
             self.feature_specs,
-            self.n_features,
             self.max_small_per_big,
         )
 

@@ -28,3 +28,22 @@ class FeatureExtractor:
         """Transform a list of window arrays (one array per item), used by the
         two-level grouped path where small windows are grouped per big window."""
         return [self.transform(X) for X in list_of_X]
+
+    def transform_grouped(self, small_windows, max_small_per_big):
+        """Transform each big window's small windows into a fixed-length feature
+        sequence: apply the extractor to each (n_small, ws, ch) array, then
+        zero-pad the tail / truncate to the head to ``max_small_per_big`` rows.
+        Returns a list of (max_small_per_big, n_features) float32 arrays."""
+        out = []
+        for smalls in small_windows:
+            feats = self.transform(smalls).astype(np.float32)  # (n_small, n_features)
+            if feats.shape[0] > max_small_per_big:
+                feats = feats[:max_small_per_big]
+            elif feats.shape[0] < max_small_per_big:
+                pad = np.zeros(
+                    (max_small_per_big - feats.shape[0], feats.shape[1]),
+                    dtype=np.float32,
+                )
+                feats = np.vstack([feats, pad])
+            out.append(feats)
+        return out

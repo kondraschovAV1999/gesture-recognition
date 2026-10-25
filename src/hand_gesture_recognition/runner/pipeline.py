@@ -31,7 +31,9 @@ from hand_gesture_recognition.pipeline.splits.strategy import (
 )
 from hand_gesture_recognition.configuration.schema import WindowedPartitions
 from hand_gesture_recognition.configuration.schema import GroupedWindowedPartitions
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import get_windowing_strategy
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import (
+    get_windowing_strategy,
+)
 from hand_gesture_recognition.pipeline.evaluation.aggregate import aggregate_folds
 from hand_gesture_recognition.configuration.schema import EvaluationResult
 from hand_gesture_recognition.pipeline.evaluation.base import evaluate
@@ -159,16 +161,7 @@ class Pipeline:
         class_names, remap = self._class_setup(cropped)
         dataset_name = cropped.metadata.name
 
-        # Visualization-only baseline (fit on the FULL cropped dataset, a
-        # diagnostic; training baselines are fit per partition in
-        # _run_partition). Fitted only when visualization needs it.
-        viz_baseline = None
-        if cfg.baseline.enabled and cfg.visualization.enabled:
-            from hand_gesture_recognition.pipeline.preprocessing.baseline import (
-                BaselineRemoval,
-            )
-
-            viz_baseline = BaselineRemoval(mode=cfg.baseline.mode).fit(cropped)
+        viz_baseline = self._viz_baseline(cropped)
 
         if cfg.cv.enabled:
             with stage(self.logger, "split"):
@@ -194,18 +187,7 @@ class Pipeline:
             result = partition_results["test"]
             fold_test_results = None
 
-        # processed dataset for visualization (baseline first, then signal).
-        processed_dataset = (
-            viz_baseline.transform(cropped) if viz_baseline is not None else cropped
-        )
-        for step_cfg in cfg.signal_processing:
-            step = instantiate(step_cfg)
-            processed_dataset = processed_dataset.replace_trials(
-                [
-                    replace(t, emg=step.transform(t.emg))
-                    for t in processed_dataset.trials
-                ]
-            )
+        processed_dataset = self._processed_dataset(cropped, viz_baseline)
 
         with stage(self.logger, "track_and_report"):
             self._track_and_report(
@@ -244,7 +226,9 @@ class Pipeline:
             json.dump(dataset_summary(dataset), f, indent=2)
         if self.cfg.analytics.run_qc:
             from hand_gesture_recognition.utils.analytics.qc import run_quality_checks
-            from hand_gesture_recognition.utils.analytics.plots import plot_class_distribution
+            from hand_gesture_recognition.utils.analytics.plots import (
+                plot_class_distribution,
+            )
 
             with open(os.path.join(d, "quality_checks.json"), "w") as f:
                 json.dump(run_quality_checks(dataset), f, indent=2)
@@ -253,6 +237,29 @@ class Pipeline:
     def _preprocess_dataset(self, dataset):
         """Apply the pre-split ``pre_steps`` (gesture crop) to the whole dataset."""
         return self._preprocessing.transform_dataset(dataset)
+
+    def _viz_baseline(self, cropped):
+        """Visualization-only baseline; None when not needed (config-driven no-op)."""
+        cfg = self.cfg
+        if not (cfg.baseline.enabled and cfg.visualization.enabled):
+            return None
+        from hand_gesture_recognition.pipeline.preprocessing.baseline import (
+            BaselineRemoval,
+        )
+
+        return BaselineRemoval(mode=cfg.baseline.mode).fit(cropped)
+
+    def _processed_dataset(self, cropped, viz_baseline):
+        """Build the visualization dataset (baseline first, then signal); identity when no steps."""
+        processed = (
+            viz_baseline.transform(cropped) if viz_baseline is not None else cropped
+        )
+        for step_cfg in self.cfg.signal_processing:
+            step = instantiate(step_cfg)
+            processed = processed.replace_trials(
+                [replace(t, emg=step.transform(t.emg)) for t in processed.trials]
+            )
+        return processed
 
     def _class_setup(self, cropped):
         """Return ``(class_names, remap)`` after optional no-gesture remapping.
