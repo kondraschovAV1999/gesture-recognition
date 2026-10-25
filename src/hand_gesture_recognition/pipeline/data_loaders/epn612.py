@@ -78,19 +78,7 @@ class EPN612Loader(DatasetLoader):
                 )
                 class_names = list(label_map.keys())
             # User info (demographics) for later analysis.
-            ui = doc.get("userInfo", {})
-            subject_info_rows[subject_id] = {
-                "age": ui.get("age"),
-                "gender": ui.get("gender"),
-                "occupation": ui.get("occupation"),
-                "ethnic_group": ui.get("ethnicGroup"),
-                "handedness": ui.get("handedness"),
-                "arm_damage": str(ui.get("ArmDamage", "False")).lower() == "true",
-                "distance_from_elbow_to_myo_cm": ui.get("distanceFromElbowToMyoInCm"),
-                "distance_from_elbow_to_ulna_cm": ui.get("distanceFromElbowToUlnaInCm"),
-                "arm_perimeter_cm": ui.get("armPerimeterInCm"),
-                "date": ui.get("date"),
-            }
+            subject_info_rows[subject_id] = _parse_user_info(doc.get("userInfo", {}))
             # Load the labeled samples. trainingSamples are always labeled. The
             # train cohort's testingSamples are labeled too (used as the test
             # split); the test cohort's testingSamples are unlabeled (held-out)
@@ -100,45 +88,13 @@ class EPN612Loader(DatasetLoader):
                 sections.append("testingSamples")
             for section in sections:
                 for key, sample in doc.get(section, {}).items():
-                    emg = sample.get("emg")
-                    if not emg:
+                    trial = _parse_sample(subject_id, section, key, sample, label_map)
+                    if trial is None:
                         continue
-                    channels = sorted(
-                        emg.keys(), key=lambda c: int(c.replace("ch", ""))
-                    )
-                    x = np.stack(
-                        [np.asarray(emg[c], dtype=np.float32) for c in channels], axis=1
-                    )
-                    gesture = sample.get("gestureName")
-                    if gesture is None or gesture not in label_map:
-                        continue
-                    # Gesture bounds: groundTruthIndex [start, end] when present,
-                    # else startPointforGestureExecution -> end of recording, else
-                    # rest trial (-1, -1).
-                    if gesture == "noGesture":
-                        g_start, g_end = -1, -1
-                    else:
-                        gti = sample.get("groundTruthIndex")
-                        if gti is not None and len(gti) == 2:
-                            g_start, g_end = int(gti[0]), int(gti[1])
-                        else:
-                            g_start = int(
-                                sample.get("startPointforGestureExecution", 0)
-                            )
-                            g_end = x.shape[0]
                     if subject_id not in trials_by_user:
                         trials_by_user[subject_id] = []
                         ordered_subject_ids.append(subject_id)
-                    trials_by_user[subject_id].append(
-                        Trial(
-                            trial_id=f"{subject_id}:{section}:{key}",
-                            user_id=subject_id,
-                            gesture_name=gesture,
-                            start=g_start,
-                            end=g_end,
-                            emg=x,
-                        )
-                    )
+                    trials_by_user[subject_id].append(trial)
 
         if not trials_by_user:
             raise FileNotFoundError(
@@ -202,3 +158,55 @@ class EPN612Loader(DatasetLoader):
     def _discover(self, path: str) -> List[str]:
         pattern = os.path.join(path, "**", "user*.json")
         return sorted(glob.glob(pattern, recursive=True))
+
+
+def _parse_user_info(ui: dict) -> dict:
+    """Extract the demographics dict from a userInfo JSON object (verbatim keys)."""
+    return {
+        "age": ui.get("age"),
+        "gender": ui.get("gender"),
+        "occupation": ui.get("occupation"),
+        "ethnic_group": ui.get("ethnicGroup"),
+        "handedness": ui.get("handedness"),
+        "arm_damage": str(ui.get("ArmDamage", "False")).lower() == "true",
+        "distance_from_elbow_to_myo_cm": ui.get("distanceFromElbowToMyoInCm"),
+        "distance_from_elbow_to_ulna_cm": ui.get("distanceFromElbowToUlnaInCm"),
+        "arm_perimeter_cm": ui.get("armPerimeterInCm"),
+        "date": ui.get("date"),
+    }
+
+
+def _parse_sample(
+    subject_id: str, section: str, key: str, sample: dict, label_map: dict
+):
+    """Parse one trainingSamples/testingSamples entry into a Trial, or None if skipped.
+
+    Mirrors the original inline logic exactly: empty emg -> None; unknown
+    gestureName -> None; noGesture -> (-1, -1) bounds; groundTruthIndex
+    [start, end] when present else startPointforGestureExecution..end.
+    """
+    emg = sample.get("emg")
+    if not emg:
+        return None
+    channels = sorted(emg.keys(), key=lambda c: int(c.replace("ch", "")))
+    x = np.stack([np.asarray(emg[c], dtype=np.float32) for c in channels], axis=1)
+    gesture = sample.get("gestureName")
+    if gesture is None or gesture not in label_map:
+        return None
+    if gesture == "noGesture":
+        g_start, g_end = -1, -1
+    else:
+        gti = sample.get("groundTruthIndex")
+        if gti is not None and len(gti) == 2:
+            g_start, g_end = int(gti[0]), int(gti[1])
+        else:
+            g_start = int(sample.get("startPointforGestureExecution", 0))
+            g_end = x.shape[0]
+    return Trial(
+        trial_id=f"{subject_id}:{section}:{key}",
+        user_id=subject_id,
+        gesture_name=gesture,
+        start=g_start,
+        end=g_end,
+        emg=x,
+    )
