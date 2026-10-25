@@ -44,7 +44,7 @@ def test_load_real_data_single_subject():
     }
 
     # Every trial is 2D (time_steps, 8 channels), variable length allowed.
-    assert all(t.ndim == 2 and t.shape[1] == 8 for t in ds.trials)
+    assert all(t.emg.ndim == 2 and t.emg.shape[1] == 8 for t in ds.trials)
 
     # Content hash is a real SHA-256 (64 hex chars), computed over the files.
     assert len(ds.metadata.content_hash) == 64
@@ -57,22 +57,22 @@ def test_load_real_data_preserves_temporal_structure():
 
     # Trials are continuous ~5s recordings (~1000 samples @ 200 Hz), not
     # pre-windowed: each is far longer than a typical 200ms window.
-    lengths = {t.shape[0] for t in ds.trials}
+    lengths = {t.emg.shape[0] for t in ds.trials}
     assert all(length >= 200 for length in lengths)
 
 
 def test_real_data_per_window_labels_match_bounds():
     from hand_gesture_recognition.configuration.schema import WindowingConfig
-    from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import window_dataset
+    from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
+        window_dataset,
+    )
 
     ds = EPN612Loader(subjects=["train:user1"]).load(DATA_PATH)
     wd = window_dataset(ds, WindowingConfig(window_size_samples=40, stride_samples=10))
 
     info = {}
-    for label, g_start, g_end, tid in zip(
-        ds.labels, ds.gesture_start, ds.gesture_end, ds.trial_ids
-    ):
-        info[str(tid)] = (int(label), int(g_start), int(g_end))
+    for t, label in zip(ds.trials, ds.labels):
+        info[str(t.trial_id)] = (int(label), int(t.start), int(t.end))
 
     assert wd.X.shape[0] > 0
     for i in range(wd.X.shape[0]):
