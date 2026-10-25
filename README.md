@@ -64,21 +64,24 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db
 
 ```
 src/hand_gesture_recognition/
-├── configuration/   # Hydra schema + Configuration Loading Module (compose/replay)
-├── data/            # Dataset, loaders, splits, shared windowing, hashing
-├── preprocessing/   # (pluggable signal preprocessing)
-├── features/        # handcrafted feature extractors
-├── prediction/      # shared Prediction schema + adapter interface
-├── classical/       # sklearn pipeline, models, Prediction adapter
-├── neural/          # Lightning datamodules, models, Prediction adapter
-├── analytics/       # dataset statistics, QC checks, plots
-├── evaluation/      # backend-independent metrics
-├── reporting/       # JSON/HTML reporters
-├── tracking/        # MLflow tracker
-├── logging_setup/   # centralized logging
-├── tracing/         # stage-level tracing
-└── runner/          # Experiment Runner orchestration
-configs/             # Hydra config groups (dataset, windowing, ...)
-tests/               # unit, integration, dataset tests
-docs/                # this documentation
+├── main.py             # CLI entry point (`python -m hand_gesture_recognition`)
+├── configuration/      # Hydra schema + Configuration Loading Module (compose/replay)
+├── runner/             # ExperimentRunner facade + Pipeline/PipelineBuilder orchestration
+├── utils/
+│   ├── datasets.py     # nested Dataset → User → Trial → emg model
+│   ├── class_selection.py, fixtures.py, hashing.py, paths.py, compare.py
+│   ├── analytics/      # dataset statistics, QC checks, plots
+│   └── observability/  # MLflow tracking, logging, tracing, reporting, visualization
+└── pipeline/
+    ├── data_loaders/   # dataset loaders (EPN612 + loader interface)
+    ├── preprocessing/  # signal transforms, learned preprocessing, PreprocessingPipeline
+    ├── splits/         # split + CV strategies (registered by name)
+    ├── feature_extraction/
+    │   ├── extraction_strategies/   # time/frequency-domain feature extractors
+    │   └── windowing/               # shared windowing + windowing strategies
+    ├── evaluation/     # backend-independent metrics + shared Prediction schema
+    └── models/         # classical/ and neural/ backends + training strategies
+configs/                # Hydra config groups (dataset, windowing, ...)
+tests/                  # unit, integration, dataset tests
+docs/                   # this documentation
 ```

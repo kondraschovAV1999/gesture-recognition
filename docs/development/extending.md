@@ -66,21 +66,21 @@ name: epn612
 path: resources/data/EPN612
 sampling_rate: 200
 loader:
-  _target_: hand_gesture_recognition.data.loaders.epn612.EPN612Loader
+  _target_: hand_gesture_recognition.pipeline.data_loaders.epn612.EPN612Loader
   subjects: null      # override with dataset.loader.subjects=[train:user1,...]
 ```
 
 **To add a new loader** (e.g. a CSV loader), implement the interface:
 
 ```python
-# src/hand_gesture_recognition/data/loaders/csv_loader.py
-from hand_gesture_recognition.data.datasets.base import Dataset
-from hand_gesture_recognition.data.loaders.base import DatasetLoader
+# src/hand_gesture_recognition/pipeline/data_loaders/csv_loader.py
+from hand_gesture_recognition.utils.datasets import Dataset
+from hand_gesture_recognition.pipeline.data_loaders.base import DatasetLoader
 
 class CsvTimeSeriesLoader(DatasetLoader):
     def load(self, path: str) -> Dataset:
-        ...  # build a Dataset (trials, labels, subject_ids, trial_ids,
-             # gesture_start/end, metadata, optional subject_info)
+        ...  # build a Dataset of Users/Trials (each Trial: emg, gesture_name,
+             # start/end bounds, user_id/trial_id), plus metadata
         return dataset
 ```
 
@@ -96,21 +96,23 @@ group); its `strategy` field defaults to `group_wise`. Built-in strategies:
 python -m hand_gesture_recognition --mode compose split.strategy=predefined
 ```
 
-**To add a new strategy**, extend `split_dataset` in
-`data/splits/base.py` (add a `elif config.strategy == "..."` branch that
-computes `train_idx`/`val_idx`/`test_idx`) and register the name in
+**To add a new strategy**, add a class to `pipeline/splits/strategy.py` (with a
+`.split(dataset, config) -> DataSplit` method) and register it with
+`@register_split("<name>")`, then add the name to the allowed set in
 `SplitConfig.validate()`.
 
-## Signal processing (deterministic, before split)
+## Signal processing
 
 `configs/signal_processing/` holds presets (e.g. `emg.yaml` = bandpass + notch
 + rectify). Select with `signal_processing=emg` (default `none`). Components
-live in `src/preprocessing/signal.py` (`RectifyTransformer`,
-`ButterworthFilter`, `EnvelopeExtractor`); learned preprocessing lives in
-`src/preprocessing/learned.py` (`PerChannelStandardScaler`). To add a signal
-transform, subclass `sklearn.base.BaseEstimator, TransformerMixin` with
-`transform(X) -> X` (operating on `(time, channels)` or `(windows, time,
-channels)` along `axis=-2`) and reference it in the `signal_processing` list.
+live in `src/hand_gesture_recognition/pipeline/preprocessing/signal.py`
+(`RectifyTransformer`, `ButterworthFilter`, `EnvelopeExtractor`); learned
+preprocessing lives in
+`src/hand_gesture_recognition/pipeline/preprocessing/learned.py`
+(`PerChannelStandardScaler`). To add a signal transform, subclass
+`sklearn.base.BaseEstimator, TransformerMixin` with `transform(X) -> X`
+(operating on `(time, channels)` or `(windows, time, channels)` along
+`axis=-2`) and reference it in the `signal_processing` list.
 
 ## Switching a classical model
 
@@ -119,9 +121,9 @@ channels)` along `axis=-2`) and reference it in the `signal_processing` list.
 ```yaml
 # @package classical
 preprocessing:
-  - _target_: hand_gesture_recognition.preprocessing.learned.PerChannelStandardScaler
+  - _target_: hand_gesture_recognition.pipeline.preprocessing.learned.PerChannelStandardScaler
 model:
-  _target_: hand_gesture_recognition.classical.models.random_forest.RandomForestEstimator
+  _target_: hand_gesture_recognition.pipeline.models.classical.random_forest.RandomForestEstimator
   n_estimators: 100
   random_state: 42
 ```
@@ -146,13 +148,13 @@ feature vector.
 
 **To add a feature extractor**, subclass
 `sklearn.base.BaseEstimator, TransformerMixin` with `transform(X) -> (n_windows, features)`
-(see `features/time_domain.py`) and reference it via `feature_type: custom` +
+(see `pipeline/feature_extraction/extraction_strategies/time_domain.py`) and reference it via `feature_type: custom` +
 the `features:` list.
 
 Built-in extractors:
 
-- `features/time_domain.py` — `TimeDomainFeatures` (RMS, std, min/max, ...).
-- `features/frequency_domain.py` — `FrequencyDomainFeatures` (total power, peak/
+- `pipeline/feature_extraction/extraction_strategies/time_domain.py` — `TimeDomainFeatures` (RMS, std, min/max, ...).
+- `pipeline/feature_extraction/extraction_strategies/frequency_domain.py` — `FrequencyDomainFeatures` (total power, peak/
   mean/median frequency per channel). Requires a `sampling_rate` kwarg (injected
   automatically from `dataset.sampling_rate` by `FeatureExtractionConfig.resolve_features`);
   it also accepts `use_hann` / `remove_dc` flags.
@@ -168,11 +170,11 @@ pipeline (or explicitly fused with neural representations later).
 ```yaml
 # @package neural
 datamodule:
-  _target_: hand_gesture_recognition.neural.datamodules.emg.EMGDataModule
+  _target_: hand_gesture_recognition.pipeline.models.neural.datamodule.EMGDataModule
   batch_size: 32
   num_workers: 0
 model:
-  _target_: hand_gesture_recognition.neural.models.lstm.LSTMModule
+  _target_: hand_gesture_recognition.pipeline.models.neural.lstm.LSTMModule
   hidden_size: 64
   num_layers: 2
   lr: 0.001
@@ -194,16 +196,17 @@ Built-in neural architectures (select with `neural=<name>`):
 Switch with `neural=dnn` / `neural=lstm` from the CLI.
 
 **To add a new neural model** (e.g. a CNN), subclass
-`hand_gesture_recognition.neural.models.base.ClassifierModule` (it provides
+`hand_gesture_recognition.pipeline.models.neural.base.ClassifierModule` (it provides
 the loss, training/validation/test steps, and optimizer — you only implement
 `forward(x) -> logits`) and add a `configs/neural/<name>.yaml` with its
 `_target_`. The neural runner passes `n_channels` and `n_classes` to the model.
 
 ## Adding a reporter
 
-Reporters consume `EvaluationResult`. Add one in `reporting/reporters.py`
-(a class with `write(report: dict, path: str)`), then it can be wired into
-`runner/run.py`'s `_persist_artifacts` (or a future reporter registry).
+Reporters consume `EvaluationResult`. Add one in
+`utils/observability/reporting.py` (a class with `write(report: dict, path:
+str)`), then it can be wired into `runner/pipeline.py`'s `_persist_artifacts`
+(or a future reporter registry).
 
 ## The general recipe
 

@@ -105,15 +105,15 @@ print(result.per_class)        # per-class precision/recall/f1 + tp/fp/tn/fn
 Each stage is independently usable:
 
 ```python
-from hand_gesture_recognition.data.loaders.epn612 import EPN612Loader
-from hand_gesture_recognition.data.splits.base import split_dataset, assert_no_group_leakage
-from hand_gesture_recognition.data.windowing.base import window_dataset
+from hand_gesture_recognition.pipeline.data_loaders.epn612 import EPN612Loader
+from hand_gesture_recognition.pipeline.splits.base import split_dataset, assert_no_group_leakage
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import window_dataset
 from hand_gesture_recognition.configuration.schema import SplitConfig, WindowingConfig
 
 # 1) load
 ds = EPN612Loader(subjects=["train:user1", "train:user2"]).load("resources/data/EPN612")
-ds.subject_info          # pandas DataFrame of per-subject demographics
-ds.gesture_start         # per-trial gesture start indices
+ds.users                 # list of User objects, each with trials + demographics
+ds.trials                # flat list of Trial objects (each has .start/.end/.emg)
 
 # 2) split (A1 predefined: train=trainingJSON.trainingSamples, ...)
 split = split_dataset(ds, SplitConfig(strategy="predefined"))

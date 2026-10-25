@@ -841,7 +841,7 @@ def window_dataset(dataset, config):
     for t in dataset.trials:
         X, y, m = window_emg(t.emg, dataset.metadata.class_names.index(t.gesture_name),
                              config, t.user_id, t.trial_id, "window",
-                             rest_bounds=None if t.is_rest else (t.start, t.end),
+                             rest_bounds=(t.start, t.end),  # rest trial -> (-1,-1) -> all rest
                              drop_rest=drop_rest)
         if len(y) == 0:
             continue
@@ -1065,7 +1065,7 @@ class TwoLevelWindowing:
             X, y, m = window_emg(
                 t.emg, dataset.metadata.class_names.index(t.gesture_name), big_cfg,
                 t.user_id, t.trial_id, "big",
-                rest_bounds=None if t.is_rest else (t.start, t.end),
+                rest_bounds=(t.start, t.end),  # rest trial -> (-1,-1) -> all rest
                 drop_rest=getattr(dataset.metadata, "drop_rest_windows", False),
             )
             for j in range(len(y)):
