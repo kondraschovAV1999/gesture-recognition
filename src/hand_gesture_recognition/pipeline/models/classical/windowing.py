@@ -3,8 +3,9 @@ from __future__ import annotations
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from hand_gesture_recognition.configuration.schema import WindowingConfig
-from hand_gesture_recognition.utils.datasets import Dataset
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import WindowedDataset, window_dataset
+from hand_gesture_recognition.configuration.schema import Dataset
+from hand_gesture_recognition.configuration.schema import WindowedDataset
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import window_dataset
 
 
 class WindowingTransformer(BaseEstimator, TransformerMixin):

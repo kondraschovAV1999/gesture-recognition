@@ -63,9 +63,7 @@ def test_load_real_data_preserves_temporal_structure():
 
 def test_real_data_per_window_labels_match_bounds():
     from hand_gesture_recognition.configuration.schema import WindowingConfig
-    from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
-        window_dataset,
-    )
+    from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import window_dataset
 
     ds = EPN612Loader(subjects=["train:user1"]).load(DATA_PATH)
     wd = window_dataset(ds, WindowingConfig(window_size_samples=40, stride_samples=10))

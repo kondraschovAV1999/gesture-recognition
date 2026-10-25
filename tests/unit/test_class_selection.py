@@ -3,7 +3,7 @@ from hand_gesture_recognition.utils.class_selection import (
     build_no_gesture_remap,
     drop_no_gesture,
 )
-from hand_gesture_recognition.utils.datasets import (
+from hand_gesture_recognition.configuration.schema import (
     Dataset,
     DatasetMetadata,
     Trial,

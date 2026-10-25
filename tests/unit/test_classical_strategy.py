@@ -1,15 +1,8 @@
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import ExperimentConfig
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
-    WindowMetadata,
-    WindowedDataset,
-    WindowedPartitions,
-)
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import (
-    GroupedWindowedDataset,
-    GroupedWindowedPartitions,
-)
+from hand_gesture_recognition.configuration.schema import WindowMetadata, WindowedDataset, WindowedPartitions
+from hand_gesture_recognition.configuration.schema import GroupedWindowedDataset, GroupedWindowedPartitions
 from hand_gesture_recognition.pipeline.models.classical.strategy import ClassicalTrainingStrategy
 
 

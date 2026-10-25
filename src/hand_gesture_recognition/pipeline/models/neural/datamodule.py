@@ -7,14 +7,8 @@ import torch
 from lightning.pytorch import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
-    WindowedDataset,
-    WindowedPartitions,
-)
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import (
-    GroupedWindowedDataset,
-    GroupedWindowedPartitions,
-)
+from hand_gesture_recognition.configuration.schema import WindowedDataset, WindowedPartitions
+from hand_gesture_recognition.configuration.schema import GroupedWindowedDataset, GroupedWindowedPartitions
 from hand_gesture_recognition.pipeline.feature_extraction.features import FeatureExtractor
 
 

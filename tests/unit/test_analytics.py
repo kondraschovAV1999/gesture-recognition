@@ -2,7 +2,7 @@ import numpy as np
 
 from hand_gesture_recognition.utils.analytics.qc import run_quality_checks
 from hand_gesture_recognition.utils.analytics.stats import dataset_summary
-from hand_gesture_recognition.utils.datasets import Dataset, DatasetMetadata, Trial
+from hand_gesture_recognition.configuration.schema import Dataset, DatasetMetadata, Trial
 
 
 def _ds():

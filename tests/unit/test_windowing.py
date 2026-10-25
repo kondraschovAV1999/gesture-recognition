@@ -1,7 +1,7 @@
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import WindowingConfig
-from hand_gesture_recognition.utils.datasets import (
+from hand_gesture_recognition.configuration.schema import (
     Dataset,
     DatasetMetadata,
     Trial,

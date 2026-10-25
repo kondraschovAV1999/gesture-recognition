@@ -3,7 +3,8 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from hand_gesture_recognition.pipeline.evaluation.prediction import Prediction, PredictionAdapter
+from hand_gesture_recognition.configuration.schema import Prediction
+from hand_gesture_recognition.pipeline.evaluation.prediction import PredictionAdapter
 
 
 class LightningPredictionAdapter(PredictionAdapter):

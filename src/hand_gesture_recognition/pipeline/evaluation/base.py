@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -12,8 +11,11 @@ from sklearn.metrics import (
     precision_recall_fscore_support,
 )
 
-from hand_gesture_recognition.configuration.schema import EvaluationConfig
-from hand_gesture_recognition.pipeline.evaluation.prediction import Prediction
+from hand_gesture_recognition.configuration.schema import (
+    EvaluationConfig,
+    EvaluationResult,
+    Prediction,
+)
 
 _METRIC_FNS = {
     "accuracy": lambda yt, yp, **k: accuracy_score(yt, yp),
@@ -21,16 +23,6 @@ _METRIC_FNS = {
     "macro_f1": lambda yt, yp, **k: f1_score(yt, yp, average="macro"),
     "weighted_f1": lambda yt, yp, **k: f1_score(yt, yp, average="weighted"),
 }
-
-
-@dataclass
-class EvaluationResult:
-    run_id: str
-    dataset_id: str
-    split: Dict[str, Any] = field(default_factory=dict)
-    metrics: Dict[str, float] = field(default_factory=dict)
-    per_class: Dict[str, Dict[str, float]] = field(default_factory=dict)
-    confusion_matrix: np.ndarray = field(default_factory=lambda: np.zeros((0, 0)))
 
 
 def evaluate(

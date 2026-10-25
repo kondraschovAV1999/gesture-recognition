@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from hand_gesture_recognition.utils.datasets import Dataset
+from hand_gesture_recognition.configuration.schema import Dataset
 
 
 class DatasetLoader(ABC):

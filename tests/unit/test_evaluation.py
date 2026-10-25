@@ -4,7 +4,7 @@ import pytest
 from hand_gesture_recognition.configuration.schema import EvaluationConfig
 from hand_gesture_recognition.pipeline.evaluation.base import evaluate
 from hand_gesture_recognition.pipeline.evaluation.grouped import evaluate_grouped
-from hand_gesture_recognition.pipeline.evaluation.prediction import Prediction
+from hand_gesture_recognition.configuration.schema import Prediction
 
 
 def _pred():

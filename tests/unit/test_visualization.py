@@ -227,7 +227,7 @@ def test_plot_raw_signal_by_class_maps_original_labels(monkeypatch, tmp_path):
     from hand_gesture_recognition.configuration.schema import (
         VisualizationSelectionConfig,
     )
-    from hand_gesture_recognition.utils.datasets import (
+    from hand_gesture_recognition.configuration.schema import (
         Dataset,
         DatasetMetadata,
         Trial,

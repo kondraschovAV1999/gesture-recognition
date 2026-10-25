@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from hand_gesture_recognition.utils.datasets import Dataset
+from hand_gesture_recognition.configuration.schema import Dataset
 
 
 def build_no_gesture_remap(dataset: Dataset):

@@ -4,8 +4,9 @@ from typing import Optional
 
 import numpy as np
 
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import WindowedDataset
-from hand_gesture_recognition.pipeline.evaluation.prediction import Prediction, PredictionAdapter
+from hand_gesture_recognition.configuration.schema import WindowedDataset
+from hand_gesture_recognition.configuration.schema import Prediction
+from hand_gesture_recognition.pipeline.evaluation.prediction import PredictionAdapter
 
 
 class SklearnPredictionAdapter(PredictionAdapter):

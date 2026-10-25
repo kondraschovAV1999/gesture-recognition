@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
 
-from hand_gesture_recognition.utils.datasets import (
+from hand_gesture_recognition.configuration.schema import (
     Dataset,
     DatasetMetadata,
     Trial,

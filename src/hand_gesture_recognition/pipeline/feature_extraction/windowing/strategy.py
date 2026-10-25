@@ -1,19 +1,23 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from typing import Dict, List
 
 import numpy as np
 
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
+from hand_gesture_recognition.configuration.schema import (
+    GroupedWindowedDataset,
     WindowMetadata,
     WindowedDataset,
-    WindowedPartitions,
+)
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
     _empty_meta,
     window_dataset,
     window_emg,
 )
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.gesture import window_gestures
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.gesture import (
+    window_gestures,
+)
 
 _REGISTRY: Dict[str, type] = {}
 
@@ -28,22 +32,6 @@ def register_windowing(name):
 
 def get_windowing_strategy(name):
     return _REGISTRY[name]()
-
-
-@dataclass
-class GroupedWindowedDataset:
-    big: WindowedDataset  # one sample per big window (classical view)
-    small_windows: List[np.ndarray]  # per big window: (n_small, small_ws, ch)
-    big_window_id: np.ndarray  # (n_big,) links small groups to big windows
-    y: np.ndarray
-    metadata: object
-
-
-@dataclass
-class GroupedWindowedPartitions:
-    train: GroupedWindowedDataset
-    val: GroupedWindowedDataset
-    test: GroupedWindowedDataset
 
 
 def _big_config(config, sampling_rate):

@@ -1,36 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 
 import numpy as np
 
-from hand_gesture_recognition.configuration.schema import WindowingConfig
-from hand_gesture_recognition.utils.datasets import Dataset
-
-
-@dataclass
-class WindowMetadata:
-    window_start: np.ndarray  # (n_windows,)
-    window_end: np.ndarray  # (n_windows,)
-    subject_ids: np.ndarray  # (n_windows,)
-    trial_ids: np.ndarray  # (n_windows,)
-    window_ids: np.ndarray  # (n_windows,) unique, traceable to trial
-
-
-@dataclass
-class WindowedDataset:
-    X: np.ndarray  # (n_windows, window_size, channels)
-    y: np.ndarray  # (n_windows,)
-    metadata: WindowMetadata
-
-
-@dataclass
-class WindowedPartitions:
-    """The single authoritative windowed representation of train/val/test."""
-
-    train: WindowedDataset
-    val: WindowedDataset
-    test: WindowedDataset
+from hand_gesture_recognition.configuration.schema import (
+    Dataset,
+    WindowingConfig,
+    WindowMetadata,
+    WindowedDataset,
+)
 
 
 def _resolve_samples(config):

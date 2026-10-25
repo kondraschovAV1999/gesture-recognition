@@ -9,8 +9,8 @@ os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
 import mlflow
 
 from hand_gesture_recognition.configuration.schema import TrackingConfig
-from hand_gesture_recognition.utils.datasets import Dataset
-from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult
+from hand_gesture_recognition.configuration.schema import Dataset
+from hand_gesture_recognition.configuration.schema import EvaluationResult
 
 
 class MlflowTracker:

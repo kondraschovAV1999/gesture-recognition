@@ -6,12 +6,12 @@ import time
 import lightning.pytorch as pl
 from hydra.utils import instantiate
 
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import GroupedWindowedPartitions
+from hand_gesture_recognition.configuration.schema import GroupedWindowedPartitions
 from hand_gesture_recognition.pipeline.models.neural.adapter import (
     LightningPredictionAdapter,
 )
 from hand_gesture_recognition.pipeline.models.neural.datamodule import GroupedEMGDataModule
-from hand_gesture_recognition.pipeline.evaluation.prediction import PartitionPredictions
+from hand_gesture_recognition.configuration.schema import PartitionPredictions
 from hand_gesture_recognition.pipeline.models.base import TrainingStrategy, register_training
 from hand_gesture_recognition.pipeline.feature_extraction.features import FeatureExtractor
 

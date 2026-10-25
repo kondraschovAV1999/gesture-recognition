@@ -2,14 +2,14 @@ import numpy as np
 import pytest
 
 from hand_gesture_recognition.configuration.schema import GestureCropConfig
-from hand_gesture_recognition.utils.datasets import (
+from hand_gesture_recognition.configuration.schema import (
     Dataset,
     DatasetMetadata,
     Trial,
     User,
 )
 from hand_gesture_recognition.pipeline.preprocessing.gesture_crop import crop_to_gesture
-from hand_gesture_recognition.pipeline.splits.base import DataSplit
+from hand_gesture_recognition.configuration.schema import DataSplit
 from hand_gesture_recognition.pipeline.preprocessing.baseline import BaselineRemoval
 from hand_gesture_recognition.pipeline.preprocessing.learned import PerChannelStandardScaler
 from hand_gesture_recognition.pipeline.preprocessing.pipeline import (

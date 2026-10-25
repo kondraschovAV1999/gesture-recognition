@@ -7,7 +7,7 @@ from datetime import datetime
 import mlflow
 
 from hand_gesture_recognition.configuration.schema import ExperimentConfig
-from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult
+from hand_gesture_recognition.configuration.schema import EvaluationResult
 from hand_gesture_recognition.utils.observability.logging import get_logger
 from hand_gesture_recognition.runner.pipeline import PipelineBuilder
 from hand_gesture_recognition.utils.observability.tracking import MlflowTracker

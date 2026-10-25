@@ -47,10 +47,8 @@ def _classical_prediction(split, windowing):
 def _neural_prediction(split, windowing):
     import lightning.pytorch as pl
 
-    from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
-        WindowedPartitions,
-        window_dataset,
-    )
+    from hand_gesture_recognition.configuration.schema import WindowedPartitions
+    from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import window_dataset
     from hand_gesture_recognition.pipeline.models.neural.adapter import (
         LightningPredictionAdapter,
     )

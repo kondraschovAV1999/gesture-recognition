@@ -4,7 +4,7 @@ from typing import List
 
 import numpy as np
 
-from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult
+from hand_gesture_recognition.configuration.schema import EvaluationResult
 
 
 def aggregate_folds(

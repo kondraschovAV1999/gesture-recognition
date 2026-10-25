@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 import numpy as np
 
-from hand_gesture_recognition.utils.datasets import Dataset
+from hand_gesture_recognition.configuration.schema import Dataset
 
 
 def dataset_summary(dataset: Dataset) -> Dict[str, Any]:

@@ -1,8 +1,8 @@
 import numpy as np
 
 from hand_gesture_recognition.pipeline.models.classical.adapter import SklearnPredictionAdapter
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import WindowMetadata, WindowedDataset
-from hand_gesture_recognition.pipeline.evaluation.prediction import PartitionPredictions, Prediction
+from hand_gesture_recognition.configuration.schema import WindowMetadata, WindowedDataset
+from hand_gesture_recognition.configuration.schema import PartitionPredictions, Prediction
 
 
 def _windowed(n=10):

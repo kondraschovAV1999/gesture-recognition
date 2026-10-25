@@ -17,10 +17,7 @@ from hand_gesture_recognition.configuration.schema import (
     WindowingConfig,
 )
 from hand_gesture_recognition.pipeline.data_loaders.epn612 import EPN612Loader
-from hand_gesture_recognition.pipeline.splits.base import (
-    assert_no_group_leakage,
-    split_dataset,
-)
+from hand_gesture_recognition.pipeline.splits.base import assert_no_group_leakage, split_dataset
 from hand_gesture_recognition.pipeline.evaluation.base import evaluate
 from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
 from hand_gesture_recognition.utils.paths import resolve_path

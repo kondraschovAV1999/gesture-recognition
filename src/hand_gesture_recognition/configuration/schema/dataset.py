@@ -8,6 +8,19 @@ import numpy as np
 
 
 @dataclass
+class DatasetConfig:
+    name: str = "epn612"
+    path: str = "resources/data/EPN612"
+    sampling_rate: float = 200.0
+    include_no_gesture: bool = True
+    loader: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "_target_": "hand_gesture_recognition.pipeline.data_loaders.epn612.EPN612Loader"
+        }
+    )
+
+
+@dataclass
 class DatasetMetadata:
     name: str
     version: str

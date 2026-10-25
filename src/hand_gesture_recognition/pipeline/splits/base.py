@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import List
 
 import numpy as np
 
-from hand_gesture_recognition.configuration.schema import SplitConfig
-from hand_gesture_recognition.utils.datasets import Dataset
-
-
-@dataclass
-class DataSplit:
-    train: Dataset
-    val: Dataset
-    test: Dataset
+from hand_gesture_recognition.configuration.schema import (
+    DataSplit,
+    Dataset,
+    SplitConfig,
+)
 
 
 def _subset(dataset: Dataset, idx: np.ndarray) -> Dataset:

@@ -9,12 +9,9 @@ from hand_gesture_recognition.configuration.schema import (
     CrossValidationConfig,
     SplitConfig,
 )
-from hand_gesture_recognition.utils.datasets import Dataset
-from hand_gesture_recognition.pipeline.splits.base import (
-    DataSplit,
-    _subset,
-    assert_no_group_leakage,
-)
+from hand_gesture_recognition.configuration.schema import Dataset
+from hand_gesture_recognition.configuration.schema import DataSplit
+from hand_gesture_recognition.pipeline.splits.base import _subset, assert_no_group_leakage
 
 _REGISTRY: dict = {}
 

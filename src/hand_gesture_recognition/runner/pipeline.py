@@ -23,23 +23,18 @@ from hydra.utils import instantiate
 
 from hand_gesture_recognition.configuration.loader import save_resolved_config
 from hand_gesture_recognition.utils.fixtures import make_synthetic_dataset
-from hand_gesture_recognition.pipeline.splits.base import (
-    DataSplit,
-    assert_no_group_leakage,
-)
+from hand_gesture_recognition.configuration.schema import DataSplit
+from hand_gesture_recognition.pipeline.splits.base import assert_no_group_leakage
 from hand_gesture_recognition.pipeline.splits.strategy import (
     get_cv_strategy,
     get_split_strategy,
 )
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
-    WindowedPartitions,
-)
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import (
-    GroupedWindowedPartitions,
-    get_windowing_strategy,
-)
+from hand_gesture_recognition.configuration.schema import WindowedPartitions
+from hand_gesture_recognition.configuration.schema import GroupedWindowedPartitions
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import get_windowing_strategy
 from hand_gesture_recognition.pipeline.evaluation.aggregate import aggregate_folds
-from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult, evaluate
+from hand_gesture_recognition.configuration.schema import EvaluationResult
+from hand_gesture_recognition.pipeline.evaluation.base import evaluate
 from hand_gesture_recognition.utils.paths import resolve_path
 from hand_gesture_recognition.pipeline.preprocessing.pipeline import (
     GestureCropStep,

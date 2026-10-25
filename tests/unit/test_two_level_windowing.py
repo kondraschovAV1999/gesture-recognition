@@ -1,16 +1,14 @@
 import numpy as np
 
 from hand_gesture_recognition.configuration.schema import WindowingConfig
-from hand_gesture_recognition.utils.datasets import (
+from hand_gesture_recognition.configuration.schema import (
     Dataset,
     DatasetMetadata,
     Trial,
     User,
 )
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import (
-    GroupedWindowedPartitions,
-    get_windowing_strategy,
-)
+from hand_gesture_recognition.configuration.schema import GroupedWindowedPartitions
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import get_windowing_strategy
 
 
 def _ds():

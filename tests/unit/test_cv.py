@@ -11,7 +11,7 @@ from hand_gesture_recognition.pipeline.splits.strategy import (
     get_cv_strategy,
 )
 from hand_gesture_recognition.pipeline.evaluation.aggregate import aggregate_folds
-from hand_gesture_recognition.pipeline.evaluation.base import EvaluationResult
+from hand_gesture_recognition.configuration.schema import EvaluationResult
 
 
 def test_cv_strategy_registry_returns_correct_types():
