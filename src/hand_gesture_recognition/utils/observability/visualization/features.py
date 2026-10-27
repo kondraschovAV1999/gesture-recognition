@@ -129,35 +129,42 @@ def _plot_features(
         X_feat = X_feat[:max_windows]
         if boundaries is not None:
             boundaries = [b for b in boundaries if b < max_windows]
+    # rows = channels, cols = feature metrics.
     fig, axes = plt.subplots(
-        len(wanted),
         len(channels),
-        figsize=(2.5 * len(channels), 1.8 * len(wanted)),
+        len(wanted),
+        figsize=(2.5 * len(wanted), 1.8 * len(channels)),
         squeeze=False,
     )
     w = np.arange(X_feat.shape[0])
-    for r, feat in enumerate(wanted):
-        row_traces = []
-        for c_idx, ch in enumerate(channels):
+    for r, ch in enumerate(channels):
+        for c_idx, feat in enumerate(wanted):
             col = f"{feat}_ch{ch + 1}"
             ax = axes[r, c_idx]
             if col in feat_names:
                 j = feat_names.index(col)
                 ax.plot(w, X_feat[:, j], lw=0.8)
-                row_traces.append(X_feat[:, j])
-                # Mark big-window boundaries (only once, on the first row's
-                # first column, but repeat per-axis is harmless).
+                # Mark big-window boundaries (dashed vertical lines).
                 for b in boundaries or []:
                     ax.axvline(b - 0.5, color="gray", linestyle="--", lw=0.6, alpha=0.7)
             else:
                 ax.set_visible(False)
             ax.set_xlabel("window")
             if c_idx == 0:
-                ax.set_ylabel(feat)
-        if row_traces:
-            _shared_ylim(axes[r, :], row_traces)
-    axes[0, 0].set_title(f"features over windows — {g_name}")
-    fig.tight_layout()
+                ax.set_ylabel(f"ch{ch + 1}")
+            if r == 0:
+                ax.set_title(feat, fontsize=9)
+    # Share the y-range per feature column (same feature across channels).
+    for c_idx, feat in enumerate(wanted):
+        col_traces = []
+        for ch in channels:
+            col = f"{feat}_ch{ch + 1}"
+            if col in feat_names:
+                col_traces.append(X_feat[:, feat_names.index(col)])
+        if col_traces:
+            _shared_ylim(axes[:, c_idx], col_traces)
+    fig.suptitle(f"features over windows — {g_name}", fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
     if path:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         fig.savefig(path, dpi=110)
