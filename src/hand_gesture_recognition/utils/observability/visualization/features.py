@@ -151,12 +151,12 @@ def _plot_features(
                     ax.axvline(b - 0.5, color="gray", linestyle="--", lw=0.6, alpha=0.7)
             else:
                 ax.set_visible(False)
-            ax.set_xlabel("small window")
+            ax.set_xlabel("window")
             if c_idx == 0:
                 ax.set_ylabel(feat)
         if row_traces:
             _shared_ylim(axes[r, :], row_traces)
-    axes[0, 0].set_title(f"features over small windows — {g_name}")
+    axes[0, 0].set_title(f"features over windows — {g_name}")
     fig.tight_layout()
     if path:
         os.makedirs(os.path.dirname(path), exist_ok=True)
