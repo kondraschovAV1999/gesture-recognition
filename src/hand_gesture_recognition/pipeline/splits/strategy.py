@@ -234,7 +234,7 @@ class KFoldCVStrategy:
                     val=_subset(dataset, val_idx),
                     test=_subset(dataset, test_idx),
                 )
-                assert_no_group_leakage(fold)
+                assert_no_group_leakage(fold, split_on=split.split_on)
                 folds.append(fold)
         else:
             splitter = KFold(n_splits=cv.n_splits, shuffle=True, random_state=cv.seed)
@@ -265,7 +265,7 @@ class LosoCVStrategy:
                 val=_subset(dataset, val_idx),
                 test=_subset(dataset, test_idx),
             )
-            assert_no_group_leakage(fold)
+            assert_no_group_leakage(fold, split_on=split.split_on)
             folds.append(fold)
         return folds
 

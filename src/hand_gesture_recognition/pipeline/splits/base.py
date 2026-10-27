@@ -23,7 +23,14 @@ def split_dataset(dataset: Dataset, config: SplitConfig) -> DataSplit:
     return get_split_strategy(config.strategy).split(dataset, config)
 
 
-def assert_no_group_leakage(split: DataSplit, group_field: str = "user_id") -> None:
+def assert_no_group_leakage(split: DataSplit, split_on: str = "subject_ids") -> None:
+    """Raise if the split's group identity leaks across partitions.
+
+    ``split_on`` is a ``SplitConfig.split_on`` value: ``"subject_ids"`` checks
+    ``Trial.user_id``, ``"trial_ids"`` checks ``Trial.trial_id``.
+    """
+    group_field = "user_id" if split_on == "subject_ids" else "trial_id"
+
     def ids(d: Dataset) -> set:
         return {getattr(t, group_field) for t in d.trials}
 

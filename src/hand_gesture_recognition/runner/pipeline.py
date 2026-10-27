@@ -286,7 +286,7 @@ class Pipeline:
         """Split the dataset into train/val/test (non-CV path)."""
         split = self._split_strategy.split(dataset, self.cfg.split)
         if self.cfg.split.strategy in ("group_wise", "session_wise", "predefined"):
-            assert_no_group_leakage(split)
+            assert_no_group_leakage(split, split_on=self.cfg.split.split_on)
         return split
 
     def _run_partition(self, split, class_names, remap, dataset_name):
