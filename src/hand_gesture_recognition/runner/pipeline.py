@@ -435,6 +435,7 @@ class Pipeline:
                     r, partition=(None if part == "test" else part)
                 )
                 self.tracker.log_confusion_matrix(r, class_names, partition=part)
+        self._log_shape_summary(processed_dataset)
         self._visualize(
             cropped,
             processed_dataset,
@@ -590,6 +591,31 @@ class Pipeline:
                 path=p,
             )
             self.tracker.log_artifact(p)
+
+    def _log_shape_summary(self, processed_dataset) -> None:
+        """Log a per-stage shape summary (console + shape_summary.json + MLflow)."""
+        from hand_gesture_recognition.utils.observability.shapes import (
+            compute_shape_summary,
+        )
+
+        feature_specs = self.cfg.feature_extraction.resolve_features(
+            self.cfg.dataset.sampling_rate
+        )
+        summary = compute_shape_summary(
+            processed_dataset,
+            self.cfg.windowing,
+            feature_specs,
+            task_name=self.cfg.task.name,
+        )
+        if not summary:
+            return
+        self.logger.info(f"shape_summary: {json.dumps(summary)}")
+        run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)
+        os.makedirs(run_dir, exist_ok=True)
+        path = os.path.join(run_dir, "shape_summary.json")
+        with open(path, "w") as f:
+            json.dump(summary, f, indent=2)
+        self.tracker.log_artifact(path)
 
     def _persist_artifacts(self, dataset, result) -> None:
         run_dir = os.path.join(self.output_root, "evaluation", self.cfg.run_id)

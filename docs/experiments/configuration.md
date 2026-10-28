@@ -273,6 +273,10 @@ Select the architecture with `neural=dnn` / `lstm` / `cnn` / `cnn_lstm`.
 | `tracking.experiment_name` | `hand_gesture_recognition` |
 | `reporting.formats` | `[json, html]` |
 
+Each run also writes a `shape_summary.json` (input → windows → features shapes
+with symbolic dimension names) into `output/evaluation/<run_id>/` and logs it
+to MLflow.
+
 ## Visualization
 
 The `visualization` group controls all generated plots. The single
