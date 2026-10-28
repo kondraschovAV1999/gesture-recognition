@@ -11,18 +11,23 @@ import mlflow
 from hand_gesture_recognition.configuration.schema import TrackingConfig
 from hand_gesture_recognition.configuration.schema import Dataset
 from hand_gesture_recognition.configuration.schema import EvaluationResult
+from hand_gesture_recognition.utils.paths import resolve_tracking_uri
 
 
 class MlflowTracker:
     def __init__(self, config: TrackingConfig):
         self.config = config
         self.run_id: Optional[str] = None
+        # Anchor relative local stores (a bare `mlruns/` dir or a relative
+        # `sqlite:///mlflow.db`) to the project root so results don't land in a
+        # subdirectory depending on the process's current working directory.
+        uri = resolve_tracking_uri(config.tracking_uri)
         # mlflow 3.x gates the local file store (e.g. a bare `mlruns/` dir)
         # behind MLFLOW_ALLOW_FILE_STORE; the tracker owns MLflow setup, so it
         # enables the file store when a scheme-less (local path) URI is used.
-        if "://" not in config.tracking_uri:
+        if "://" not in uri:
             os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
-        mlflow.set_tracking_uri(config.tracking_uri)
+        mlflow.set_tracking_uri(uri)
         mlflow.set_experiment(config.experiment_name)
 
     def start(self, run_id: str) -> None:
