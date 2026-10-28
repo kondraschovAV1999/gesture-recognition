@@ -18,6 +18,7 @@ class WindowingConfig:
     overlap_percent: Optional[float] = None
     label_granularity: str = "per_window"  # per_window | sequence
     padding: str = "none"  # none | zero
+    label_threshold: float = 0.5  # fraction of samples that must be in the gesture
     # --- big window (used only when mode == "two_level") ---
     big_window_size_samples: Optional[int] = None
     big_window_size_seconds: Optional[float] = None

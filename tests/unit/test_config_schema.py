@@ -246,6 +246,12 @@ def test_feature_extraction_validate_accepts_combined_names():
     f.validate()  # must not raise
 
 
+def test_windowing_label_threshold_default():
+    from hand_gesture_recognition.configuration.schema import WindowingConfig
+
+    assert WindowingConfig().label_threshold == 0.5
+
+
 def test_evaluation_breakdown_by_parses_and_validates():
     from hand_gesture_recognition.configuration.schema import EvaluationConfig
 
