@@ -156,6 +156,7 @@ python -m hand_gesture_recognition --mode compose cv=kfold cv.group_folds=false
 | `mode` | `single` \| `two_level` | `single` |
 | `big_window_size_samples` / `big_window_size_seconds` | one or the other (two_level only) | `null` |
 | `big_stride_samples` / `big_stride_seconds` / `big_overlap_percent` | one of the three (two_level only) | `null` |
+| `label_threshold` | fraction of a window's samples that must fall inside the gesture interval to keep the gesture label (`0.0` = any overlap) | `0.5` (majority) |
 
 `windowing=two_level` enables two-level windowing: the trial is segmented into
 **big windows** (filtered independently), then **small windows** are slid inside
