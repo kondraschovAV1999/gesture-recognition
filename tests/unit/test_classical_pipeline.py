@@ -5,11 +5,17 @@ from sklearn.pipeline import Pipeline
 from hand_gesture_recognition.pipeline.models.classical.random_forest import (
     RandomForestEstimator,
 )
-from hand_gesture_recognition.pipeline.models.classical.windowing import WindowingTransformer
+from hand_gesture_recognition.pipeline.models.classical.windowing import (
+    WindowingTransformer,
+)
 from hand_gesture_recognition.configuration.schema import WindowingConfig
 from hand_gesture_recognition.utils.fixtures import make_synthetic_dataset
-from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
-from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import FrequencyDomainFeatures
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import (
+    TimeDomainFeatures,
+)
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import (
+    FrequencyDomainFeatures,
+)
 
 
 def test_windowing_transformer_calls_shared_windowing():
@@ -44,8 +50,20 @@ def test_time_domain_features_per_channel():
     # 1 window, 3 time steps, 1 channel: values [0, 2, 4]
     X = np.array([[[0.0], [2.0], [4.0]]], dtype=np.float32)  # (1, 3, 1)
     out = TimeDomainFeatures().transform(X)
-    assert out.shape == (1, 7)  # 7 features x 1 channel
-    rms, std, mn, mx, mean, mx_mean, mn_mx = out[0]
+    assert out.shape == (1, 11)  # 11 features x 1 channel
+    (
+        rms,
+        std,
+        mn,
+        mx,
+        mean,
+        mx_mean,
+        mn_mx,
+        mav,
+        iemg,
+        variance,
+        wl,
+    ) = out[0]
     assert rms == pytest.approx(np.sqrt(20 / 3))
     assert std == pytest.approx(np.std([0.0, 2.0, 4.0]))
     assert mn == 0.0
@@ -53,13 +71,25 @@ def test_time_domain_features_per_channel():
     assert mean == 2.0
     assert mx_mean == pytest.approx(2.0)  # max / mean = 4 / 2
     assert mn_mx == 0.0  # min / max = 0 / 4
+    assert mav == pytest.approx(2.0)  # (0 + 2 + 4) / 3
+    assert iemg == pytest.approx(6.0)  # 0 + 2 + 4
+    assert variance == pytest.approx(np.var([0.0, 2.0, 4.0]))  # 8 / 3
+    assert wl == pytest.approx(4.0)  # |2-0| + |4-2|
+
+
+def test_time_domain_features_subset():
+    X = np.array([[[0.0], [2.0], [4.0]]], dtype=np.float32)  # (1, 3, 1)
+    out = TimeDomainFeatures(features=["wl", "mav"]).transform(X)
+    assert out.shape == (1, 2)  # 2 selected features x 1 channel
+    wl, mav = out[0]
+    assert wl == pytest.approx(4.0)
+    assert mav == pytest.approx(2.0)
 
 
 def test_time_domain_features_8_channels():
     X = np.zeros((5, 40, 8), dtype=np.float32)  # 5 windows, 40 time, 8 channels
     out = TimeDomainFeatures().transform(X)
-    assert out.shape == (5, 56)  # 7 features x 8 channels
-    # all-zero input must not produce NaN (division guards)
+    assert out.shape == (5, 88)  # 11 features x 8 channels
     assert np.isfinite(out).all()
 
 
@@ -68,5 +98,5 @@ def test_time_and_frequency_features_concatenate():
     time_feat = TimeDomainFeatures().fit_transform(X)
     freq_feat = FrequencyDomainFeatures(sampling_rate=200.0).fit_transform(X)
     combined = np.concatenate([time_feat, freq_feat], axis=1)
-    assert combined.shape == (5, 7 * 8 + 4 * 8)  # union of both extractors
+    assert combined.shape == (5, 11 * 8 + 4 * 8)  # union of both extractors
     assert np.isfinite(combined).all()

@@ -8,8 +8,12 @@ from hand_gesture_recognition.configuration.schema import (
     User,
 )
 from hand_gesture_recognition.configuration.schema import GroupedWindowedPartitions
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import get_windowing_strategy
-from hand_gesture_recognition.pipeline.models.neural.datamodule import GroupedEMGDataModule
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy import (
+    get_windowing_strategy,
+)
+from hand_gesture_recognition.pipeline.models.neural.datamodule import (
+    GroupedEMGDataModule,
+)
 
 
 def _grouped_partitions():
@@ -49,9 +53,11 @@ def _grouped_partitions():
 def test_grouped_datamodule_shapes():
     partitions = _grouped_partitions()
     feature_specs = [
-        {"_target_": "hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain.TimeDomainFeatures"}
+        {
+            "_target_": "hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain.TimeDomainFeatures"
+        }
     ]
-    n_features = 7 * 2  # 7 time-domain features x 2 channels
+    n_features = 11 * 2  # 11 time-domain features x 2 channels
     max_small_per_big = max(len(s) for s in partitions.train.small_windows)
     dm = GroupedEMGDataModule(
         windowed=partitions,

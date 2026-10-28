@@ -1,7 +1,11 @@
 import numpy as np
 
-from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import TimeDomainFeatures
-from hand_gesture_recognition.pipeline.feature_extraction.features import FeatureExtractor
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.time_domain import (
+    TimeDomainFeatures,
+)
+from hand_gesture_recognition.pipeline.feature_extraction.features import (
+    FeatureExtractor,
+)
 
 
 class DoublingStub:
@@ -35,8 +39,8 @@ def test_single_extractor_shape():
             }
         ]
     )
-    assert fe.fit_transform(X).shape == (n_windows, 7 * n_channels)
-    assert fe.transform(X).shape == (n_windows, 7 * n_channels)
+    assert fe.fit_transform(X).shape == (n_windows, 11 * n_channels)
+    assert fe.transform(X).shape == (n_windows, 11 * n_channels)
 
 
 def test_two_extractors_concatenate_along_axis1():
@@ -55,11 +59,11 @@ def test_two_extractors_concatenate_along_axis1():
         ]
     )
     out = fe.fit_transform(X)
-    expected_cols = 7 * n_channels + n_time * n_channels
+    expected_cols = 11 * n_channels + n_time * n_channels
     assert out.shape == (n_windows, expected_cols)
     # Left block = time-domain features; right block = doubled (flattened) values.
-    assert np.allclose(out[:, : 7 * n_channels], TimeDomainFeatures().transform(X))
-    assert np.allclose(out[:, 7 * n_channels :], (X * 2.0).reshape(n_windows, -1))
+    assert np.allclose(out[:, : 11 * n_channels], TimeDomainFeatures().transform(X))
+    assert np.allclose(out[:, 11 * n_channels :], (X * 2.0).reshape(n_windows, -1))
 
 
 def test_empty_specs_return_zero_columns():
@@ -84,4 +88,4 @@ def test_transform_windows():
     outs = fe.transform_windows(windows)
     assert len(outs) == 2
     for w, o in zip(windows, outs):
-        assert o.shape == (w.shape[0], 7 * 4)
+        assert o.shape == (w.shape[0], 11 * 4)

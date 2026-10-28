@@ -87,6 +87,10 @@ def test_feature_name_constants():
         "mean",
         "max_over_mean",
         "min_over_max",
+        "mav",
+        "iemg",
+        "variance",
+        "wl",
     ]
     assert FrequencyDomainFeatures.FEATURE_NAMES == [
         "total_power",
