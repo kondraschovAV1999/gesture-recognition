@@ -5,8 +5,14 @@ import torch
 from hand_gesture_recognition.configuration.schema import SplitConfig, WindowingConfig
 from hand_gesture_recognition.utils.fixtures import make_synthetic_dataset
 from hand_gesture_recognition.pipeline.splits.base import split_dataset
-from hand_gesture_recognition.configuration.schema import WindowedPartitions, WindowMetadata, WindowedDataset
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import window_dataset
+from hand_gesture_recognition.configuration.schema import (
+    WindowedPartitions,
+    WindowMetadata,
+    WindowedDataset,
+)
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
+    window_dataset,
+)
 from hand_gesture_recognition.pipeline.models.neural.adapter import (
     LightningPredictionAdapter,
 )
@@ -143,3 +149,18 @@ def test_optimizer_is_configurable():
     assert isinstance(opt, torch.optim.SGD)
     assert opt.defaults["lr"] == 0.1
     assert opt.defaults["momentum"] == 0.9
+
+
+def test_classifier_module_computes_macro_f1():
+    model = DNNModule(n_channels=8, n_classes=3, hidden_dims=(16,))
+    # F1 metrics are registered per split and compute a valid macro F1.
+    assert model.train_f1 is not None
+    assert model.val_f1 is not None
+    assert model.test_f1 is not None
+    f1 = model.val_f1
+    f1.update(torch.tensor([0, 1, 2]), torch.tensor([0, 1, 2]))  # perfect -> 1.0
+    assert float(f1.compute()) == pytest.approx(1.0)
+    f1.reset()
+    f1.update(torch.tensor([0, 0, 0]), torch.tensor([0, 1, 2]))  # degraded -> < 1.0
+    assert 0.0 <= float(f1.compute()) < 1.0
+    f1.reset()

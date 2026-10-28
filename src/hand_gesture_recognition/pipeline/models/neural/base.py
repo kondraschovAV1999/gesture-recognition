@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 
 import torch
 import torch.nn.functional as F
+import torchmetrics
 from lightning.pytorch import LightningModule
 
 
@@ -15,12 +16,24 @@ class ClassifierModule(LightningModule):
     optimizer type and its hyperparameters are configurable.
     """
 
-    def __init__(self, optimizer: Optional[Dict[str, Any]] = None):
+    def __init__(self, n_classes: int, optimizer: Optional[Dict[str, Any]] = None):
         super().__init__()
+        self.n_classes = n_classes
         self.optimizer_config = optimizer or {
             "_target_": "torch.optim.Adam",
             "lr": 1e-3,
         }
+        # Per-split macro F1 (epoch-level). Direct attributes so the metrics are
+        # registered as submodules (and move with the model to the device).
+        self.train_f1 = torchmetrics.F1Score(
+            task="multiclass", num_classes=n_classes, average="macro"
+        )
+        self.val_f1 = torchmetrics.F1Score(
+            task="multiclass", num_classes=n_classes, average="macro"
+        )
+        self.test_f1 = torchmetrics.F1Score(
+            task="multiclass", num_classes=n_classes, average="macro"
+        )
 
     def _step(self, batch, prefix: str) -> torch.Tensor:
         x = batch["x"]
@@ -29,8 +42,11 @@ class ClassifierModule(LightningModule):
         loss = F.cross_entropy(logits, y)
         preds = logits.argmax(dim=1)
         acc = (preds == y).float().mean()
+        f1 = getattr(self, f"{prefix}_f1")
+        f1.update(preds, y)
         self.log(f"{prefix}_loss", loss, prog_bar=True)
         self.log(f"{prefix}_acc", acc, prog_bar=True)
+        self.log(f"{prefix}_f1", f1, on_step=False, on_epoch=True, prog_bar=True)
         return loss
 
     def training_step(self, batch, batch_idx):

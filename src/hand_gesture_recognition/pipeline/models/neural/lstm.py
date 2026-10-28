@@ -16,7 +16,7 @@ class LSTMModule(ClassifierModule):
         num_layers: int = 2,
         optimizer=None,
     ):
-        super().__init__(optimizer=optimizer)
+        super().__init__(n_classes=n_classes, optimizer=optimizer)
         self.lstm = nn.LSTM(
             input_size=n_channels,
             hidden_size=hidden_size,

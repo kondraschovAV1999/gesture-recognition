@@ -25,7 +25,7 @@ class CNNModule(ClassifierModule):
         kernel_size: int = 3,
         optimizer=None,
     ):
-        super().__init__(optimizer=optimizer)
+        super().__init__(n_classes=n_classes, optimizer=optimizer)
         layers = []
         in_channels = n_channels
         for filters in conv_filters:

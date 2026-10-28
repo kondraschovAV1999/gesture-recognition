@@ -27,7 +27,7 @@ class CNNLSTMModule(ClassifierModule):
         num_layers: int = 1,
         optimizer=None,
     ):
-        super().__init__(optimizer=optimizer)
+        super().__init__(n_classes=n_classes, optimizer=optimizer)
         layers = []
         in_channels = n_channels
         for filters in conv_filters:
