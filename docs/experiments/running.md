@@ -37,7 +37,8 @@ For a full reference of every config group and its fields, see
 | `dataset.loader.subjects=[train:user1,train:user2,...]` | load a subset of the real EPN612 data |
 | `split.strategy=group_wise` / `random` / `trial_wise` / `predefined` | choose the split strategy |
 | `backend=classical` / `neural` | choose the pipeline |
-| `feature_extraction.feature_type=time_domain` / `frequency_domain` / `combined` / `custom` | choose the handcrafted feature representation |
+| `feature_extraction.feature_type=time_domain` / `frequency_domain` / `combined` | choose the handcrafted feature representation |
+| `feature_extraction.features=[rms,wl,...]` | restrict which named features are computed (empty = all) |
 | `neural=dnn` / `lstm` / `cnn` / `cnn_lstm` | choose the neural model (incl. the composite CNN + LSTM) |
 | `neural.trainer.max_epochs=10` | set training epochs |
 | `windowing.window_size_seconds=0.2` `windowing.stride_seconds=0.05` | window size / stride |

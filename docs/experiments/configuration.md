@@ -203,19 +203,33 @@ trial-level split (`random`/`stratified`/`trial_wise`). Preset: `baseline=per_us
 
 ### `feature_extraction`
 
-| Field | Values | Default |
+| Field | Type | Meaning |
 |---|---|---|
-| `feature_type` | `time_domain` \| `frequency_domain` \| `combined` \| `custom` | `time_domain` |
-| `features` | explicit `_target_` list (when `feature_type: custom`) | `[]` |
+| `feature_type` | `time_domain` \| `frequency_domain` \| `combined` | Which extractor(s) to run |
+| `features` | list of **names** (strings) | Which features to compute; `[]` = all |
 
 `feature_type` picks the handcrafted feature representation:
 
 | `feature_type` | extractors |
 |---|---|
-| `time_domain` | `TimeDomainFeatures` (RMS, std, min, max, mean, max/mean, min/max) |
-| `frequency_domain` | `FrequencyDomainFeatures` (total power, peak/mean/median frequency) |
+| `time_domain` | `TimeDomainFeatures` (11 per-channel features) |
+| `frequency_domain` | `FrequencyDomainFeatures` (4 per-channel features) |
 | `combined` | both, concatenated column-wise |
-| `custom` | whatever you list in `feature_extraction.features` |
+
+`features` is a list of feature names (not channel numbers):
+
+```yaml
+feature_extraction:
+  feature_type: time_domain
+  features: [rms, mav, wl]     # compute only these three
+```
+
+Feature names:
+
+- Time-domain: `rms`, `std`, `min`, `max`, `mean`, `max_over_mean`,
+  `min_over_max`, `mav`, `iemg`, `variance`, `wl`
+- Frequency-domain: `total_power`, `peak_frequency`, `mean_frequency`,
+  `median_frequency`
 
 ### `classical`
 
@@ -344,8 +358,10 @@ The same selection is applied to all three plot families — if you select
 
 Takes **feature names** (not channel numbers — channels come from `selection`):
 
-- Time-domain: `rms`, `std`, `min`, `max`, `mean`, `max_over_mean`, `min_over_max`
-- Frequency-domain: `total_power`, `peak_frequency`, `mean_frequency`, `median_frequency`
+- Time-domain: `rms`, `std`, `min`, `max`, `mean`, `max_over_mean`,
+  `min_over_max`, `mav`, `iemg`, `variance`, `wl`
+- Frequency-domain: `total_power`, `peak_frequency`, `mean_frequency`,
+  `median_frequency`
 
 ```yaml
 feature_over_windows:

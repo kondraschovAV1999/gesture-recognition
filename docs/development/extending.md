@@ -136,7 +136,13 @@ knob (select from the CLI with `feature_extraction.feature_type=<name>`):
 | `time_domain` | `TimeDomainFeatures` |
 | `frequency_domain` | `FrequencyDomainFeatures` (sampling rate auto-injected from the dataset) |
 | `combined` | both, concatenated column-wise |
-| `custom` | an explicit `feature_extraction.features:` list of `_target_` entries (for any other extractor) |
+
+A subset of features can be requested by name with
+`feature_extraction.features=[rms, wl, ...]` (empty = all). The canonical
+feature-name catalogs live in
+`configuration/schema/feature_extraction.py`
+(`TIME_DOMAIN_FEATURE_NAMES` / `FREQUENCY_DOMAIN_FEATURE_NAMES`) and are
+imported by the extractors as their `FEATURE_NAMES`.
 
 Swap the model by editing `model._target_` (e.g. to a `SVC` or
 `LogisticRegression` `_target_`), or add a new file under `configs/classical/`
@@ -146,18 +152,14 @@ extractors are listed they are applied independently and concatenated
 column-wise (FeatureUnion), so `combined` composes time + frequency into one
 feature vector.
 
-**To add a feature extractor**, subclass
-`sklearn.base.BaseEstimator, TransformerMixin` with `transform(X) -> (n_windows, features)`
-(see `pipeline/feature_extraction/extraction_strategies/time_domain.py`) and reference it via `feature_type: custom` +
-the `features:` list.
+To add a new handcrafted feature, add its name to the appropriate catalog and
+add a compute function to the extractor's `_COMPUTE` dispatch map (see
+`pipeline/feature_extraction/extraction_strategies/time_domain.py`).
 
 Built-in extractors:
 
-- `pipeline/feature_extraction/extraction_strategies/time_domain.py` — `TimeDomainFeatures` (RMS, std, min/max, ...).
-- `pipeline/feature_extraction/extraction_strategies/frequency_domain.py` — `FrequencyDomainFeatures` (total power, peak/
-  mean/median frequency per channel). Requires a `sampling_rate` kwarg (injected
-  automatically from `dataset.sampling_rate` by `FeatureExtractionConfig.resolve_features`);
-  it also accepts `use_hann` / `remove_dc` flags.
+- `pipeline/feature_extraction/extraction_strategies/time_domain.py` — `TimeDomainFeatures` (rms, std, min, max, mean, max_over_mean, min_over_max, mav, iemg, variance, wl per channel).
+- `pipeline/feature_extraction/extraction_strategies/frequency_domain.py` — `FrequencyDomainFeatures` (total power, peak/mean/median frequency per channel). Requires a `sampling_rate` kwarg (injected automatically from `dataset.sampling_rate` by `FeatureExtractionConfig.resolve_features`); it also accepts `use_hann` / `remove_dc` flags.
 
 ## Switching a neural model
 
