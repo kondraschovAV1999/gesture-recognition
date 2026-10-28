@@ -124,6 +124,26 @@ def test_feature_extraction_rejects_unknown_feature_name():
         validate_experiment_config(cfg)
 
 
+def test_feature_extraction_combined_partitions_names():
+    cfg = load_config(mode="compose", overrides=["backend=classical"])
+    cfg.feature_extraction.feature_type = "combined"
+    cfg.feature_extraction.features = ["rms", "total_power"]
+    specs = cfg.feature_extraction.resolve_features(cfg.dataset.sampling_rate)
+    time_spec = next(s for s in specs if "TimeDomainFeatures" in s["_target_"])
+    freq_spec = next(s for s in specs if "FrequencyDomainFeatures" in s["_target_"])
+    assert time_spec["features"] == ["rms"]
+    assert freq_spec["features"] == ["total_power"]
+
+
+def test_feature_extraction_combined_omits_unselected_domain():
+    cfg = load_config(mode="compose", overrides=["backend=classical"])
+    cfg.feature_extraction.feature_type = "combined"
+    cfg.feature_extraction.features = ["rms"]
+    specs = cfg.feature_extraction.resolve_features(cfg.dataset.sampling_rate)
+    assert len(specs) == 1
+    assert "TimeDomainFeatures" in specs[0]["_target_"]
+
+
 def test_compose_defaults_to_recognition_task():
     cfg = load_config(mode="compose")
     assert cfg.task.name == "recognition"

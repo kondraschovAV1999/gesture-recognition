@@ -74,10 +74,19 @@ class FeatureExtractionConfig:
         if self.feature_type == "frequency_domain":
             return [_frequency_domain_feature(sampling_rate, self.features)]
         if self.feature_type == "combined":
-            return [
-                _time_domain_feature(self.features),
-                _frequency_domain_feature(sampling_rate, self.features),
-            ]
+            if not self.features:
+                return [
+                    _time_domain_feature([]),
+                    _frequency_domain_feature(sampling_rate, []),
+                ]
+            td = [n for n in self.features if n in TIME_DOMAIN_FEATURE_NAMES]
+            fd = [n for n in self.features if n in FREQUENCY_DOMAIN_FEATURE_NAMES]
+            specs: List[Dict[str, Any]] = []
+            if td:
+                specs.append(_time_domain_feature(td))
+            if fd:
+                specs.append(_frequency_domain_feature(sampling_rate, fd))
+            return specs
         raise ConfigValidationError(
             f"feature_extraction.feature_type={self.feature_type!r} not in {_FEATURE_TYPES}"
         )
