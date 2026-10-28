@@ -1,4 +1,5 @@
 import numpy as np
+from functools import partial
 
 from hand_gesture_recognition.configuration.schema import WindowingConfig
 from hand_gesture_recognition.configuration.schema import (
@@ -12,7 +13,8 @@ from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy imp
     get_windowing_strategy,
 )
 from hand_gesture_recognition.pipeline.models.neural.datamodule import (
-    GroupedEMGDataModule,
+    EMGDataModule,
+    EMGDataset,
 )
 
 
@@ -59,13 +61,12 @@ def test_grouped_datamodule_shapes():
     ]
     n_features = 11 * 2  # 11 time-domain features x 2 channels
     max_small_per_big = max(len(s) for s in partitions.train.small_windows)
-    dm = GroupedEMGDataModule(
-        windowed=partitions,
+    builder = partial(
+        EMGDataset.from_grouped,
         feature_specs=feature_specs,
-        n_features=n_features,
         max_small_per_big=max_small_per_big,
-        batch_size=2,
     )
+    dm = EMGDataModule(partitions, builder, batch_size=2)
     dm.setup()
     batch = next(iter(dm.train_dataloader()))
     # 2 big windows per batch, seq len max_small_per_big, n_features columns

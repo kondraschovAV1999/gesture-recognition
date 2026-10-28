@@ -18,7 +18,7 @@ from hand_gesture_recognition.pipeline.models.neural.adapter import (
 )
 from hand_gesture_recognition.pipeline.models.neural.datamodule import (
     EMGDataModule,
-    EMGWindowDataset,
+    EMGDataset,
 )
 from hand_gesture_recognition.pipeline.models.neural.dnn import DNNModule
 from hand_gesture_recognition.pipeline.models.neural.lstm import LSTMModule
@@ -51,7 +51,9 @@ def _windowed_partitions():
 
 def test_emg_datamodule_does_not_re_window():
     wp = _windowed_partitions()
-    dm = EMGDataModule(windowed=wp, batch_size=8)
+    dm = EMGDataModule(
+        partitions=wp, dataset_builder=EMGDataset.from_windowed, batch_size=8
+    )
     dm.setup()
     X = next(iter(dm.train_dataloader()))
     # batch is a dict carrying metadata
@@ -70,7 +72,7 @@ def test_emg_datamodule_does_not_re_window():
 
 def test_emg_window_dataset_returns_metadata_dict():
     wp = _windowed_partitions()
-    ds = EMGWindowDataset(wp.train)
+    ds = EMGDataset.from_windowed(wp.train)
     item = ds[0]
     assert item["x"].shape == (40, 8)
     assert item["y_true"].ndim == 0

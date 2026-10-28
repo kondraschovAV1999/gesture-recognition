@@ -12,7 +12,8 @@ from hand_gesture_recognition.pipeline.feature_extraction.windowing.strategy imp
     get_windowing_strategy,
 )
 from hand_gesture_recognition.pipeline.models.neural.datamodule import (
-    ParallelConvGroupedEMGDataset,
+    EMGDataset,
+    ReshapeToChannelFirstImage,
 )
 
 _TIME_SPEC = [
@@ -53,13 +54,11 @@ def test_parallel_conv_dataset_reshapes_to_channels_first():
     grouped = _grouped()
     n_channels = grouped.big.X.shape[-1]  # 2
     max_small = max(len(s) for s in grouped.small_windows)
-    n_features = 11 * n_channels  # 11 time-domain features x 2 channels = 22
-    ds = ParallelConvGroupedEMGDataset(
+    ds = EMGDataset.from_grouped(
         grouped,
         _TIME_SPEC,
-        n_features=n_features,
-        n_channels=n_channels,
-        max_small_per_big=max_small,
+        max_small,
+        transform=ReshapeToChannelFirstImage(n_channels),
     )
     item = ds[0]
     assert isinstance(item["x"], torch.Tensor)

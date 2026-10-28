@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from functools import partial
 
 import lightning.pytorch as pl
 from hydra.utils import instantiate
@@ -11,8 +12,9 @@ from hand_gesture_recognition.pipeline.models.neural.adapter import (
     LightningPredictionAdapter,
 )
 from hand_gesture_recognition.pipeline.models.neural.datamodule import (
-    GroupedEMGDataModule,
-    ParallelConvGroupedEMGDataModule,
+    EMGDataModule,
+    EMGDataset,
+    ReshapeToChannelFirstImage,
 )
 from hand_gesture_recognition.configuration.schema import PartitionPredictions
 from hand_gesture_recognition.pipeline.models.base import (
@@ -28,12 +30,11 @@ from hand_gesture_recognition.pipeline.feature_extraction.features import (
 class NeuralTrainingStrategy(TrainingStrategy):
     """Neural (PyTorch Lightning) train+prediction.
 
-    Reproduces the old ``_train_and_predict_neural`` /
-    ``_train_and_predict_neural_two_level`` behaviour: seed + quiet Lightning
-    logging, build the datamodule (flat ``EMGDataModule`` for
-    ``WindowedPartitions``, grouped ``GroupedEMGDataModule`` for
-    ``GroupedWindowedPartitions``), fit, predict train/val/test with timing, and
-    normalize through the Lightning prediction adapter.
+    Seeds + quiets Lightning logging, builds a unified ``EMGDataModule`` (a
+    per-model ``dataset_builder`` selects raw windows, handcrafted feature
+    sequences, or channels-first feature images), fits, predicts
+    train/val/test with timing, and normalizes through the Lightning
+    prediction adapter.
     """
 
     def train_predict(self, windowed, class_names, cfg) -> PartitionPredictions:
@@ -45,6 +46,9 @@ class NeuralTrainingStrategy(TrainingStrategy):
             cfg.dataset.sampling_rate
         )
         n_classes = len(class_names)
+
+        batch_size = cfg.neural.datamodule.get("batch_size", 32)
+        num_workers = cfg.neural.datamodule.get("num_workers", 0)
 
         if isinstance(windowed, GroupedWindowedPartitions):
             n_features = self._compute_n_features(feature_specs, windowed)
@@ -60,29 +64,31 @@ class NeuralTrainingStrategy(TrainingStrategy):
             if "ParallelConvModule" in model_target:
                 # 2D conv consumes (C, H, F): in_channels = EMG channels.
                 n_channels = windowed.train.big.X.shape[-1]
-                datamodule = ParallelConvGroupedEMGDataModule(
-                    windowed=windowed,
+                builder = partial(
+                    EMGDataset.from_grouped,
                     feature_specs=feature_specs,
-                    n_features=n_features,
-                    n_channels=n_channels,
                     max_small_per_big=max_small_per_big,
-                    batch_size=cfg.neural.datamodule.get("batch_size", 32),
-                    num_workers=cfg.neural.datamodule.get("num_workers", 0),
+                    transform=ReshapeToChannelFirstImage(n_channels),
                 )
             else:
-                datamodule = GroupedEMGDataModule(
-                    windowed=windowed,
-                    feature_specs=feature_specs,
-                    n_features=n_features,
-                    max_small_per_big=max_small_per_big,
-                    batch_size=cfg.neural.datamodule.get("batch_size", 32),
-                    num_workers=cfg.neural.datamodule.get("num_workers", 0),
-                )
                 n_channels = n_features
+                builder = partial(
+                    EMGDataset.from_grouped,
+                    feature_specs=feature_specs,
+                    max_small_per_big=max_small_per_big,
+                )
+            datamodule = EMGDataModule(
+                windowed, builder, batch_size=batch_size, num_workers=num_workers
+            )
         else:
             n_channels = windowed.train.X.shape[-1]
-            dm_partial = instantiate(cfg.neural.datamodule, _partial_=True)
-            datamodule = dm_partial(windowed=windowed)
+            datamodule = EMGDataModule(
+                windowed,
+                EMGDataset.from_windowed,
+                batch_size=batch_size,
+                num_workers=num_workers,
+                shuffle_train=cfg.neural.datamodule.get("shuffle", False),
+            )
 
         model_partial = instantiate(
             cfg.neural.model,

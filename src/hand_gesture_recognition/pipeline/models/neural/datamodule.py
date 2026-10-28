@@ -1,304 +1,166 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 
+import numpy as np
 import torch
 from lightning.pytorch import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 
 from hand_gesture_recognition.configuration.schema import (
-    WindowedDataset,
-    WindowedPartitions,
-)
-from hand_gesture_recognition.configuration.schema import (
     GroupedWindowedDataset,
     GroupedWindowedPartitions,
+    WindowMetadata,
+    WindowedDataset,
+    WindowedPartitions,
 )
 from hand_gesture_recognition.pipeline.feature_extraction.features import (
     FeatureExtractor,
 )
 
-
-class EMGWindowDataset(Dataset):
-    """Maps a `WindowedDataset` to a torch Dataset whose items carry metadata."""
-
-    def __init__(self, windowed: WindowedDataset):
-        self.windowed = windowed
-
-    def __len__(self):
-        return len(self.windowed.y)
-
-    def __getitem__(self, idx):
-        return {
-            "x": torch.as_tensor(self.windowed.X[idx], dtype=torch.float32),
-            "y_true": torch.as_tensor(self.windowed.y[idx], dtype=torch.long),
-            "window_id": self.windowed.metadata.window_ids[idx],
-            "trial_id": self.windowed.metadata.trial_ids[idx],
-            "subject_id": self.windowed.metadata.subject_ids[idx],
-            "window_start": self.windowed.metadata.window_start[idx],
-            "window_end": self.windowed.metadata.window_end[idx],
-        }
+TensorTransform = Callable[[torch.Tensor], torch.Tensor]
 
 
-class EMGDataModule(LightningDataModule):
-    """Wraps already-windowed partitions into DataLoaders (no windowing here)."""
+class ReshapeToChannelFirstImage:
+    """Reshape feature-major ``(..., H, F*C)`` sequences into ``(..., C, H, F)``.
 
-    def __init__(
-        self,
-        windowed: WindowedPartitions,
-        batch_size: int = 32,
-        num_workers: int = 0,
-        shuffle: bool = False,
-    ):
-        super().__init__()
-        self.windowed = windowed
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.shuffle = shuffle
-        self._train: Optional[Dataset] = None
-        self._val: Optional[Dataset] = None
-        self._test: Optional[Dataset] = None
+    The handcrafted extractor emits columns ordered ``feat -> channel``; this
+    separates them and moves the channel axis in front of the spatial axes so a
+    2D conv can treat the small-window axis as height and the feature axis as
+    width.
+    """
 
-    def setup(self, stage: Optional[str] = None) -> None:
-        self._train = EMGWindowDataset(self.windowed.train)
-        self._val = EMGWindowDataset(self.windowed.val)
-        self._test = EMGWindowDataset(self.windowed.test)
+    def __init__(self, n_channels: int):
+        self.n_channels = n_channels
 
-    def train_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self._train,
-            batch_size=self.batch_size,
-            shuffle=self.shuffle,
-            num_workers=self.num_workers,
-        )
-
-    def val_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self._val,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-        )
-
-    def test_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self._test,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-        )
-
-    def predict_dataloader(self) -> DataLoader:
-        return self.test_dataloader()
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        *batch_dims, height, total_features = x.shape
+        f_per_channel = total_features // self.n_channels
+        x = x.reshape(*batch_dims, height, f_per_channel, self.n_channels)
+        return x.movedim(-1, -3)  # (..., C, height, F)
 
 
-class GroupedEMGDataset(Dataset):
-    """One item per big window: a fixed-length sequence of small-window features.
+class EMGDataset(Dataset):
+    """Unified dataset for raw windows and grouped handcrafted-feature sequences.
 
-    Absorbs the old ``TwoLevelEMGDataset``: each big window's small windows are
-    transformed by a ``FeatureExtractor`` into a ``(n_small, n_features)``
-    matrix, then padded/truncated to a fixed ``max_small_per_big`` sequence
-    length (zero-pad the tail / truncate to the head, matching the old
-    two-level behaviour).
+    ``from_windowed`` maps a ``WindowedDataset`` (raw ``(n, time, ch)`` windows).
+    ``from_grouped`` maps a ``GroupedWindowedDataset`` by first computing the
+    handcrafted small-window features ``(max_small, F*C)``. An optional
+    ``transform`` (a pure tensor->tensor callable) is applied once up-front.
     """
 
     def __init__(
         self,
+        x: Union[np.ndarray, List[np.ndarray], torch.Tensor],
+        y: Union[np.ndarray, List[int], torch.Tensor],
+        metadata: WindowMetadata,
+        transform: Optional[TensorTransform] = None,
+        include_window_bounds: bool = False,
+    ):
+        x_tensor = torch.as_tensor(np.asarray(x), dtype=torch.float32)
+        if transform is not None:
+            x_tensor = transform(x_tensor)
+
+        self.x = x_tensor
+        self.y_true = torch.as_tensor(np.asarray(y), dtype=torch.long)
+        self.metadata = metadata
+        self.include_window_bounds = include_window_bounds
+
+    @classmethod
+    def from_windowed(
+        cls,
+        windowed: WindowedDataset,
+        transform: Optional[TensorTransform] = None,
+    ) -> "EMGDataset":
+        return cls(
+            x=windowed.X,
+            y=windowed.y,
+            metadata=windowed.metadata,
+            transform=transform,
+            include_window_bounds=True,
+        )
+
+    @classmethod
+    def from_grouped(
+        cls,
         grouped: GroupedWindowedDataset,
         feature_specs: List,
         max_small_per_big: int,
-    ):
-        self.y_true = grouped.y
-        self.window_ids = grouped.metadata.window_ids
-        self.trial_ids = grouped.metadata.trial_ids
-        self.subject_ids = grouped.metadata.subject_ids
-        self.sequences = FeatureExtractor(feature_specs).transform_grouped(
+        transform: Optional[TensorTransform] = None,
+    ) -> "EMGDataset":
+        sequences = FeatureExtractor(feature_specs).transform_grouped(
             grouped.small_windows, max_small_per_big
         )
+        return cls(
+            x=sequences,
+            y=grouped.y,
+            metadata=cast(WindowMetadata, grouped.metadata),
+            transform=transform,
+            include_window_bounds=False,
+        )
 
-    def __len__(self):
-        return len(self.sequences)
+    def __len__(self) -> int:
+        return len(self.y_true)
 
-    def __getitem__(self, idx):
-        return {
-            "x": torch.as_tensor(self.sequences[idx], dtype=torch.float32),
-            "y_true": torch.as_tensor(self.y_true[idx], dtype=torch.long),
-            "window_id": self.window_ids[idx],
-            "trial_id": self.trial_ids[idx],
-            "subject_id": self.subject_ids[idx],
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        item = {
+            "x": self.x[idx],
+            "y_true": self.y_true[idx],
+            "window_id": self.metadata.window_ids[idx],
+            "trial_id": self.metadata.trial_ids[idx],
+            "subject_id": self.metadata.subject_ids[idx],
         }
+        if self.include_window_bounds:
+            item["window_start"] = self.metadata.window_start[idx]
+            item["window_end"] = self.metadata.window_end[idx]
+        return item
 
 
-class GroupedEMGDataModule(LightningDataModule):
-    """Wraps grouped (two-level) windowing into DataLoaders of feature sequences."""
+class EMGDataModule(LightningDataModule):
+    """Generic datamodule that wraps any partition set via a dataset factory."""
 
     def __init__(
         self,
-        windowed: GroupedWindowedPartitions,
-        feature_specs: List,
-        n_features: int,
-        max_small_per_big: int,
+        partitions: Union[WindowedPartitions, GroupedWindowedPartitions],
+        dataset_builder: Callable[[Any], Dataset],
         batch_size: int = 32,
         num_workers: int = 0,
+        shuffle_train: bool = False,
     ):
         super().__init__()
-        self.windowed = windowed
-        self.feature_specs = feature_specs
-        # unused: the feature width is now derived inside FeatureExtractor.
-        # Kept for backward-compatible construction by NeuralTrainingStrategy.
-        self.n_features = n_features
-        self.max_small_per_big = max_small_per_big
+        self.partitions = partitions
+        self.dataset_builder = dataset_builder
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.shuffle_train = shuffle_train
+
         self._train: Optional[Dataset] = None
         self._val: Optional[Dataset] = None
         self._test: Optional[Dataset] = None
 
     def setup(self, stage: Optional[str] = None) -> None:
-        self._train = GroupedEMGDataset(
-            self.windowed.train,
-            self.feature_specs,
-            self.max_small_per_big,
-        )
-        self._val = GroupedEMGDataset(
-            self.windowed.val,
-            self.feature_specs,
-            self.max_small_per_big,
-        )
-        self._test = GroupedEMGDataset(
-            self.windowed.test,
-            self.feature_specs,
-            self.max_small_per_big,
+        if stage in (None, "fit"):
+            self._train = self.dataset_builder(self.partitions.train)
+            self._val = self.dataset_builder(self.partitions.val)
+        if stage in (None, "test", "predict"):
+            self._test = self.dataset_builder(self.partitions.test)
+
+    def _make_loader(self, dataset: Dataset, shuffle: bool = False) -> DataLoader:
+        return DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=shuffle,
+            num_workers=self.num_workers,
         )
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self._train,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-        )
+        return self._make_loader(self._train, shuffle=self.shuffle_train)
 
     def val_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self._val,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-        )
+        return self._make_loader(self._val, shuffle=False)
 
     def test_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self._test,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-        )
+        return self._make_loader(self._test, shuffle=False)
 
     def predict_dataloader(self) -> DataLoader:
-        return self.test_dataloader()
-
-
-class ParallelConvGroupedEMGDataset(Dataset):
-    """One item per big window: small-window features reshaped to (C, H, F).
-
-    The handcrafted extractor emits feature-major ``(n_small, F*C)``; this
-    reshapes to ``(channels, small_windows, features)`` so a 2D conv can treat
-    the small-window axis as height and the feature axis as width.
-    """
-
-    def __init__(
-        self, grouped, feature_specs, n_features, n_channels, max_small_per_big
-    ):
-        self.y_true = grouped.y
-        self.window_ids = grouped.metadata.window_ids
-        self.trial_ids = grouped.metadata.trial_ids
-        self.subject_ids = grouped.metadata.subject_ids
-        self.n_channels = n_channels
-        self.max_small_per_big = max_small_per_big
-        self.f_per_channel = n_features // n_channels
-        self.sequences = FeatureExtractor(feature_specs).transform_grouped(
-            grouped.small_windows, max_small_per_big
-        )
-
-    def __len__(self):
-        return len(self.sequences)
-
-    def __getitem__(self, idx):
-        feats = self.sequences[idx]  # (max_small, F*C) feature-major
-        x = feats.reshape(self.max_small_per_big, self.f_per_channel, self.n_channels)
-        x = x.transpose(2, 0, 1)  # (C, max_small, F)
-        return {
-            "x": torch.as_tensor(x, dtype=torch.float32),
-            "y_true": torch.as_tensor(self.y_true[idx], dtype=torch.long),
-            "window_id": self.window_ids[idx],
-            "trial_id": self.trial_ids[idx],
-            "subject_id": self.subject_ids[idx],
-        }
-
-
-class ParallelConvGroupedEMGDataModule(LightningDataModule):
-    """Wraps two-level partitions into DataLoaders of (C, H, F) feature images."""
-
-    def __init__(
-        self,
-        windowed,
-        feature_specs,
-        n_features,
-        n_channels,
-        max_small_per_big,
-        batch_size=32,
-        num_workers=0,
-    ):
-        super().__init__()
-        self.windowed = windowed
-        self.feature_specs = feature_specs
-        self.n_features = n_features
-        self.n_channels = n_channels
-        self.max_small_per_big = max_small_per_big
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self._train = None
-        self._val = None
-        self._test = None
-
-    def _make(self, grouped):
-        return ParallelConvGroupedEMGDataset(
-            grouped,
-            self.feature_specs,
-            self.n_features,
-            self.n_channels,
-            self.max_small_per_big,
-        )
-
-    def setup(self, stage=None):
-        self._train = self._make(self.windowed.train)
-        self._val = self._make(self.windowed.val)
-        self._test = self._make(self.windowed.test)
-
-    def train_dataloader(self):
-        return DataLoader(
-            self._train,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-        )
-
-    def val_dataloader(self):
-        return DataLoader(
-            self._val,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-        )
-
-    def test_dataloader(self):
-        return DataLoader(
-            self._test,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-        )
-
-    def predict_dataloader(self):
         return self.test_dataloader()
