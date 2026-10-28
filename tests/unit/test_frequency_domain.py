@@ -1,7 +1,9 @@
 import numpy as np
 import pytest
 
-from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import FrequencyDomainFeatures
+from hand_gesture_recognition.pipeline.feature_extraction.extraction_strategies.frequency_domain import (
+    FrequencyDomainFeatures,
+)
 
 
 def test_output_shape_per_channel():
@@ -48,3 +50,26 @@ def test_rejects_too_few_samples():
 def test_rejects_nonpositive_sampling_rate():
     with pytest.raises(ValueError):
         FrequencyDomainFeatures(sampling_rate=0.0).transform(np.zeros((2, 8, 3)))
+
+
+def test_subset_selection():
+    fs = 200.0
+    n = 100
+    t = np.arange(n) / fs
+    tone = np.sin(2 * np.pi * 20.0 * t).astype(np.float32)
+    X = tone[None, :, None]  # (1, n, 1)
+
+    full = FrequencyDomainFeatures(sampling_rate=fs).transform(X)
+    sub = FrequencyDomainFeatures(sampling_rate=fs, features=["total_power"]).transform(
+        X
+    )
+    assert sub.shape == (1, 1)  # 1 selected feature x 1 channel
+    assert np.allclose(sub[:, 0], full[:, 0])  # total_power block matches full
+
+
+def test_subset_selection_order():
+    X = np.random.default_rng(0).normal(0, 1, size=(3, 40, 2)).astype(np.float32)
+    out = FrequencyDomainFeatures(
+        sampling_rate=200.0, features=["median_frequency", "peak_frequency"]
+    ).transform(X)
+    assert out.shape == (3, 4)  # 2 selected features x 2 channels
