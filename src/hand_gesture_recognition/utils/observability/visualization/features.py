@@ -23,8 +23,8 @@ def plot_feature_over_windows(
     class_names: List[str],
     run_dir: str,
 ) -> List[str]:
-    """One figure per selected gesture: rows = features, cols = channels,
-    value vs window index.
+    """One figure per selected gesture: rows = channels, cols = feature
+    metrics, value vs window index.
 
     In two-level mode features are computed over the SMALL windows (that is
     what the pipeline does — big windows are only preprocessed, never
