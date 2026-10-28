@@ -1,0 +1,25 @@
+# @package neural
+datamodule:
+  _target_: hand_gesture_recognition.pipeline.models.neural.datamodule.EMGDataModule
+  batch_size: 32
+  num_workers: 0
+model:
+  _target_: hand_gesture_recognition.pipeline.models.neural.parallel_conv.ParallelConvModule
+  out_channels: 18
+optimizer:
+  _target_: torch.optim.Adam
+  lr: 0.001
+  weight_decay: 0.0
+early_stopping:
+  _target_: lightning.pytorch.callbacks.EarlyStopping
+  monitor: val_f1
+  patience: 5
+  mode: max
+trainer:
+  _target_: lightning.pytorch.Trainer
+  max_epochs: 100
+  accelerator: auto
+  enable_progress_bar: true
+  enable_model_summary: true
+  enable_checkpointing: false
+  logger: true

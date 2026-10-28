@@ -244,12 +244,15 @@ Feature names:
 | Field | Values | Default (`neural=lstm`) |
 |---|---|---|
 | `datamodule` | `EMGDataModule` + `batch_size`, `num_workers`, `shuffle` | `batch_size: 32` |
-| `model` | `DNNModule` \| `LSTMModule` \| `CNNModule` \| `CNNLSTMModule` | `LSTMModule` |
+| `model` | `DNNModule` \| `LSTMModule` \| `CNNModule` \| `CNNLSTMModule` \| `ParallelConvModule` | `LSTMModule` |
 | `optimizer` | `_target_` (`torch.optim.Adam`/`SGD`/`AdamW`/`RMSprop`) + `lr` | `Adam`, `lr: 0.001` |
 | `early_stopping` | `EarlyStopping` or `null` | `val_loss`, patience 5 |
 | `trainer` | `lightning.pytorch.Trainer` kwargs | `max_epochs: 100`, `accelerator: auto` |
 
 Select the architecture with `neural=dnn` / `lstm` / `cnn` / `cnn_lstm`.
+
+`parallel_conv` is a 2D parallel-conv feature extractor over the handcrafted
+small-window features, used in two-level mode (`neural=parallel_conv`).
 
 ### `evaluation`
 

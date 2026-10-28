@@ -10,10 +10,18 @@ from hand_gesture_recognition.configuration.schema import GroupedWindowedPartiti
 from hand_gesture_recognition.pipeline.models.neural.adapter import (
     LightningPredictionAdapter,
 )
-from hand_gesture_recognition.pipeline.models.neural.datamodule import GroupedEMGDataModule
+from hand_gesture_recognition.pipeline.models.neural.datamodule import (
+    GroupedEMGDataModule,
+    ParallelConvGroupedEMGDataModule,
+)
 from hand_gesture_recognition.configuration.schema import PartitionPredictions
-from hand_gesture_recognition.pipeline.models.base import TrainingStrategy, register_training
-from hand_gesture_recognition.pipeline.feature_extraction.features import FeatureExtractor
+from hand_gesture_recognition.pipeline.models.base import (
+    TrainingStrategy,
+    register_training,
+)
+from hand_gesture_recognition.pipeline.feature_extraction.features import (
+    FeatureExtractor,
+)
 
 
 @register_training("neural")
@@ -48,15 +56,29 @@ class NeuralTrainingStrategy(TrainingStrategy):
                 ),
                 default=1,
             )
-            datamodule = GroupedEMGDataModule(
-                windowed=windowed,
-                feature_specs=feature_specs,
-                n_features=n_features,
-                max_small_per_big=max_small_per_big,
-                batch_size=cfg.neural.datamodule.get("batch_size", 32),
-                num_workers=cfg.neural.datamodule.get("num_workers", 0),
-            )
-            n_channels = n_features
+            model_target = cfg.neural.model.get("_target_", "")
+            if "ParallelConvModule" in model_target:
+                # 2D conv consumes (C, H, F): in_channels = EMG channels.
+                n_channels = windowed.train.big.X.shape[-1]
+                datamodule = ParallelConvGroupedEMGDataModule(
+                    windowed=windowed,
+                    feature_specs=feature_specs,
+                    n_features=n_features,
+                    n_channels=n_channels,
+                    max_small_per_big=max_small_per_big,
+                    batch_size=cfg.neural.datamodule.get("batch_size", 32),
+                    num_workers=cfg.neural.datamodule.get("num_workers", 0),
+                )
+            else:
+                datamodule = GroupedEMGDataModule(
+                    windowed=windowed,
+                    feature_specs=feature_specs,
+                    n_features=n_features,
+                    max_small_per_big=max_small_per_big,
+                    batch_size=cfg.neural.datamodule.get("batch_size", 32),
+                    num_workers=cfg.neural.datamodule.get("num_workers", 0),
+                )
+                n_channels = n_features
         else:
             n_channels = windowed.train.X.shape[-1]
             dm_partial = instantiate(cfg.neural.datamodule, _partial_=True)
