@@ -63,7 +63,9 @@ def test_load_real_data_preserves_temporal_structure():
 
 def test_real_data_per_window_labels_match_bounds():
     from hand_gesture_recognition.configuration.schema import WindowingConfig
-    from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import window_dataset
+    from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
+        window_dataset,
+    )
 
     ds = EPN612Loader(subjects=["train:user1"]).load(DATA_PATH)
     wd = window_dataset(ds, WindowingConfig(window_size_samples=40, stride_samples=10))
@@ -79,8 +81,7 @@ def test_real_data_per_window_labels_match_bounds():
         e = int(wd.metadata.window_end[i])
         if g_start < 0:  # rest trial
             expected = 0
-        elif e <= g_start or s >= g_end:  # fully outside the gesture segment
-            expected = 0
-        else:  # overlaps the gesture segment
-            expected = label
+        else:
+            overlap = max(0, min(e, g_end) - max(s, g_start))
+            expected = label if overlap / (e - s) > 0.5 else 0
         assert wd.y[i] == expected

@@ -7,7 +7,10 @@ from hand_gesture_recognition.configuration.schema import (
     Trial,
     User,
 )
-from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import window_dataset, window_emg
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.base import (
+    window_dataset,
+    window_emg,
+)
 
 
 def _cfg(ws, stride):
@@ -30,8 +33,9 @@ def test_window_emg_rest_detection():
     X, y, meta = window_emg(
         emg, 5, _cfg(4, 2), "s1", "t1", "s1_t1", rest_bounds=(4, 10)
     )
-    # window at 0 is rest (ends at 4, not overlapping [4,10]); window at 2 overlaps
-    assert y.tolist() == [0, 5, 5, 5]
+    # window at 0 is rest (no overlap); window at 2 is 50% inside -> rest (majority);
+    # windows at 4 and 6 are fully inside -> gesture.
+    assert y.tolist() == [0, 0, 5, 5]
     assert meta.window_start.tolist() == [0, 2, 4, 6]
 
 
@@ -49,9 +53,9 @@ def test_window_emg_drop_rest():
     X, y, meta = window_emg(
         emg, 5, _cfg(4, 2), "s1", "t1", "s1_t1", rest_bounds=(4, 10), drop_rest=True
     )
-    assert y.tolist() == [5, 5, 5]
-    assert meta.window_start.tolist() == [2, 4, 6]
-    assert X.shape == (3, 4, 1)
+    assert y.tolist() == [5, 5]
+    assert meta.window_start.tolist() == [4, 6]
+    assert X.shape == (2, 4, 1)
 
 
 def _dataset():
@@ -112,11 +116,6 @@ def test_window_dataset_matches_flat_behavior():
 
 
 def test_window_dataset_drops_rest_windows_when_no_gesture_dropped():
-    # A single gesture trial whose EMG extends beyond the gesture interval
-    # [start, end]. With ws=40, stride=20 the trailing context (samples 80..139)
-    # produces windows that fall entirely outside [start, end] (rest windows).
-    # (An emg length of ~100 is too short to isolate a 40-sample rest window,
-    # so use 140 to actually exercise the drop path.)
     emg_len = 140
     start, end = 20, 80
     trial = Trial(
@@ -128,8 +127,6 @@ def test_window_dataset_drops_rest_windows_when_no_gesture_dropped():
         np.arange(emg_len, dtype=np.float32)[:, None],
     )
 
-    # Dropped config: class_names=["fist"], so label 0 now means "fist" and any
-    # rest window (which would be labeled 0) must be dropped entirely.
     dropped_meta = DatasetMetadata(
         name="x",
         version="0",
@@ -141,13 +138,12 @@ def test_window_dataset_drops_rest_windows_when_no_gesture_dropped():
     )
     dropped = Dataset.from_trials([trial], dropped_meta)
     wd = window_dataset(dropped, _cfg(40, 20))
-    assert wd.y.tolist() == [0, 0, 0, 0]  # all "fist"
-    assert wd.metadata.window_start.tolist() == [0, 20, 40, 60]
-    # No window lies fully outside the gesture interval [start, end]:
+    # windows [0,40] and [60,100] are only 50% inside [20,80] -> rest -> dropped
+    assert wd.y.tolist() == [0, 0]
+    assert wd.metadata.window_start.tolist() == [20, 40]
     assert (wd.metadata.window_start >= end).sum() == 0
     assert (wd.metadata.window_end <= start).sum() == 0
 
-    # Recognition config (no-gesture kept) still emits rest windows labeled 0.
     kept_meta = DatasetMetadata(
         name="x",
         version="0",
@@ -158,5 +154,28 @@ def test_window_dataset_drops_rest_windows_when_no_gesture_dropped():
     )
     kept = Dataset.from_trials([trial], kept_meta)
     wd_kept = window_dataset(kept, _cfg(40, 20))
-    assert wd_kept.y.tolist() == [1, 1, 1, 1, 0, 0]
+    assert wd_kept.y.tolist() == [0, 1, 1, 0, 0, 0]
     assert wd_kept.metadata.window_start.tolist() == [0, 20, 40, 60, 80, 100]
+
+
+def test_window_dataset_respects_label_threshold():
+    trial = Trial("t1", "s1", "fist", 4, 10, np.ones((10, 1), np.float32))
+    meta = DatasetMetadata(
+        name="x",
+        version="0",
+        sampling_rate=200.0,
+        channels=["c1"],
+        class_names=["noGesture", "fist"],
+        content_hash="h",
+    )
+    ds = Dataset.from_trials([trial], meta)
+    majority = window_dataset(
+        ds,
+        WindowingConfig(window_size_samples=4, stride_samples=2, label_threshold=0.5),
+    )
+    overlap = window_dataset(
+        ds,
+        WindowingConfig(window_size_samples=4, stride_samples=2, label_threshold=0.0),
+    )
+    assert majority.y.tolist() == [0, 0, 1, 1]  # window [2,6] is 50% -> rest
+    assert overlap.y.tolist() == [0, 1, 1, 1]  # window [2,6] overlaps -> gesture

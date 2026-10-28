@@ -10,6 +10,9 @@ from hand_gesture_recognition.configuration.schema import (
     WindowMetadata,
     WindowedDataset,
 )
+from hand_gesture_recognition.pipeline.feature_extraction.windowing.labeling import (
+    ThresholdLabeling,
+)
 
 
 def _resolve_samples(config):
@@ -61,6 +64,9 @@ def window_emg(
     g_start = g_end = None
     if rest_bounds is not None:
         g_start, g_end = rest_bounds
+    labeling = (
+        ThresholdLabeling(config.label_threshold) if rest_bounds is not None else None
+    )
     n = (length - ws) // stride + 1
     xs, ys, starts, ends, wins = [], [], [], [], []
     for i in range(n):
@@ -69,7 +75,7 @@ def window_emg(
         if rest_bounds is None:
             is_rest = False
         else:
-            is_rest = (g_start < 0) or (e <= g_start) or (s >= g_end)
+            is_rest = labeling.is_rest(s, e, g_start, g_end)
         if drop_rest and is_rest:
             continue
         xs.append(emg[s:e])
