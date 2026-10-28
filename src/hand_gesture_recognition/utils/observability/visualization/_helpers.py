@@ -70,7 +70,7 @@ def resolve_selection(
 
 
 def _feature_matrix(X: np.ndarray, sampling_rate: float):
-    """(n_windows, 11*n_channels) matrix + flattened per-column names."""
+    """(n_windows, 15*n_channels) matrix (11 time-domain + 4 frequency-domain) + flattened per-column names."""
     td = TimeDomainFeatures().transform(X)
     fd = FrequencyDomainFeatures(sampling_rate=sampling_rate).transform(X)
     n_ch = X.shape[-1]
