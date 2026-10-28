@@ -182,19 +182,68 @@ def test_per_user_requires_trial_level_split():
 
 
 def test_feature_extraction_config_defaults():
-    from hand_gesture_recognition.configuration.schema import FeatureExtractionConfig
+    from hand_gesture_recognition.configuration.schema import (
+        FeatureExtractionConfig,
+        FREQUENCY_DOMAIN_FEATURE_NAMES,
+        TIME_DOMAIN_FEATURE_NAMES,
+    )
 
     f = FeatureExtractionConfig()
     assert f.feature_type == "time_domain"
     assert f.features == []
+    assert TIME_DOMAIN_FEATURE_NAMES == [
+        "rms",
+        "std",
+        "min",
+        "max",
+        "mean",
+        "max_over_mean",
+        "min_over_max",
+        "mav",
+        "iemg",
+        "variance",
+        "wl",
+    ]
+    assert FREQUENCY_DOMAIN_FEATURE_NAMES == [
+        "total_power",
+        "peak_frequency",
+        "mean_frequency",
+        "median_frequency",
+    ]
 
 
-def test_feature_extraction_validate_rejects_custom_without_features():
+def test_feature_extraction_validate_rejects_custom():
     from hand_gesture_recognition.configuration.schema import FeatureExtractionConfig
 
     f = FeatureExtractionConfig(feature_type="custom")
     with pytest.raises(ConfigValidationError):
         f.validate()
+
+
+def test_feature_extraction_validate_rejects_unknown_feature():
+    from hand_gesture_recognition.configuration.schema import FeatureExtractionConfig
+
+    f = FeatureExtractionConfig(feature_type="time_domain", features=["rms", "bogus"])
+    with pytest.raises(ConfigValidationError):
+        f.validate()
+
+
+def test_feature_extraction_validate_rejects_cross_domain_feature():
+    from hand_gesture_recognition.configuration.schema import FeatureExtractionConfig
+
+    # total_power is a frequency-domain feature, not time-domain.
+    f = FeatureExtractionConfig(feature_type="time_domain", features=["total_power"])
+    with pytest.raises(ConfigValidationError):
+        f.validate()
+
+
+def test_feature_extraction_validate_accepts_combined_names():
+    from hand_gesture_recognition.configuration.schema import FeatureExtractionConfig
+
+    f = FeatureExtractionConfig(
+        feature_type="combined", features=["rms", "total_power"]
+    )
+    f.validate()  # must not raise
 
 
 def test_evaluation_breakdown_by_parses_and_validates():

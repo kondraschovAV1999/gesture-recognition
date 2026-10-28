@@ -30,7 +30,9 @@ from hand_gesture_recognition.configuration.schema.experiment import (
     validate_experiment_config,
 )
 from hand_gesture_recognition.configuration.schema.feature_extraction import (
+    FREQUENCY_DOMAIN_FEATURE_NAMES,
     FeatureExtractionConfig,
+    TIME_DOMAIN_FEATURE_NAMES,
 )
 from hand_gesture_recognition.configuration.schema.models import (
     ClassicalConfig,
@@ -79,6 +81,7 @@ __all__ = [
     "EvaluationConfig",
     "EvaluationResult",
     "ExperimentConfig",
+    "FREQUENCY_DOMAIN_FEATURE_NAMES",
     "FeatureExtractionConfig",
     "FeatureOverWindowsConfig",
     "GestureCropConfig",
@@ -93,6 +96,7 @@ __all__ = [
     "SUPPORTED_TASKS",
     "SplitConfig",
     "TaskConfig",
+    "TIME_DOMAIN_FEATURE_NAMES",
     "TrackingConfig",
     "Trial",
     "User",

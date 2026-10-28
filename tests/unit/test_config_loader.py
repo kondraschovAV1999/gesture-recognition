@@ -96,6 +96,34 @@ def test_feature_extraction_defaults_to_time_domain():
     assert cfg.feature_extraction.feature_type == "time_domain"
 
 
+def test_feature_extraction_injects_selected_features():
+    from hand_gesture_recognition.configuration.schema import validate_experiment_config
+
+    cfg = load_config(mode="compose", overrides=["backend=classical"])
+    cfg.feature_extraction.feature_type = "time_domain"
+    cfg.feature_extraction.features = ["rms", "mav"]
+    specs = cfg.feature_extraction.resolve_features(cfg.dataset.sampling_rate)
+    assert specs[0]["features"] == ["rms", "mav"]
+    # the selection passes validation (no error for known names)
+    validate_experiment_config(cfg)
+
+
+def test_feature_extraction_empty_features_omit_key():
+    cfg = load_config(mode="compose", overrides=["backend=classical"])
+    cfg.feature_extraction.feature_type = "time_domain"
+    specs = cfg.feature_extraction.resolve_features(cfg.dataset.sampling_rate)
+    assert "features" not in specs[0]  # empty list -> all features
+
+
+def test_feature_extraction_rejects_unknown_feature_name():
+    from hand_gesture_recognition.configuration.schema import validate_experiment_config
+
+    cfg = load_config(mode="compose", overrides=["backend=classical"])
+    cfg.feature_extraction.features = ["nope"]
+    with pytest.raises(ConfigValidationError):
+        validate_experiment_config(cfg)
+
+
 def test_compose_defaults_to_recognition_task():
     cfg = load_config(mode="compose")
     assert cfg.task.name == "recognition"
