@@ -197,3 +197,108 @@ class GroupedEMGDataModule(LightningDataModule):
 
     def predict_dataloader(self) -> DataLoader:
         return self.test_dataloader()
+
+
+class ParallelConvGroupedEMGDataset(Dataset):
+    """One item per big window: small-window features reshaped to (C, H, F).
+
+    The handcrafted extractor emits feature-major ``(n_small, F*C)``; this
+    reshapes to ``(channels, small_windows, features)`` so a 2D conv can treat
+    the small-window axis as height and the feature axis as width.
+    """
+
+    def __init__(
+        self, grouped, feature_specs, n_features, n_channels, max_small_per_big
+    ):
+        self.y_true = grouped.y
+        self.window_ids = grouped.metadata.window_ids
+        self.trial_ids = grouped.metadata.trial_ids
+        self.subject_ids = grouped.metadata.subject_ids
+        self.n_channels = n_channels
+        self.max_small_per_big = max_small_per_big
+        self.f_per_channel = n_features // n_channels
+        self.sequences = FeatureExtractor(feature_specs).transform_grouped(
+            grouped.small_windows, max_small_per_big
+        )
+
+    def __len__(self):
+        return len(self.sequences)
+
+    def __getitem__(self, idx):
+        feats = self.sequences[idx]  # (max_small, F*C) feature-major
+        x = feats.reshape(self.max_small_per_big, self.f_per_channel, self.n_channels)
+        x = x.transpose(2, 0, 1)  # (C, max_small, F)
+        return {
+            "x": torch.as_tensor(x, dtype=torch.float32),
+            "y_true": torch.as_tensor(self.y_true[idx], dtype=torch.long),
+            "window_id": self.window_ids[idx],
+            "trial_id": self.trial_ids[idx],
+            "subject_id": self.subject_ids[idx],
+        }
+
+
+class ParallelConvGroupedEMGDataModule(LightningDataModule):
+    """Wraps two-level partitions into DataLoaders of (C, H, F) feature images."""
+
+    def __init__(
+        self,
+        windowed,
+        feature_specs,
+        n_features,
+        n_channels,
+        max_small_per_big,
+        batch_size=32,
+        num_workers=0,
+    ):
+        super().__init__()
+        self.windowed = windowed
+        self.feature_specs = feature_specs
+        self.n_features = n_features
+        self.n_channels = n_channels
+        self.max_small_per_big = max_small_per_big
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self._train = None
+        self._val = None
+        self._test = None
+
+    def _make(self, grouped):
+        return ParallelConvGroupedEMGDataset(
+            grouped,
+            self.feature_specs,
+            self.n_features,
+            self.n_channels,
+            self.max_small_per_big,
+        )
+
+    def setup(self, stage=None):
+        self._train = self._make(self.windowed.train)
+        self._val = self._make(self.windowed.val)
+        self._test = self._make(self.windowed.test)
+
+    def train_dataloader(self):
+        return DataLoader(
+            self._train,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self._val,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self._test,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+    def predict_dataloader(self):
+        return self.test_dataloader()
