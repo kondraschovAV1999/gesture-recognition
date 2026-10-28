@@ -73,3 +73,11 @@ def test_subset_selection_order():
         sampling_rate=200.0, features=["median_frequency", "peak_frequency"]
     ).transform(X)
     assert out.shape == (3, 4)  # 2 selected features x 2 channels
+
+
+def test_empty_features_list_means_all():
+    X = np.random.default_rng(0).normal(0, 1, size=(3, 40, 2)).astype(np.float32)
+    full = FrequencyDomainFeatures(sampling_rate=200.0).transform(X)
+    empty = FrequencyDomainFeatures(sampling_rate=200.0, features=[]).transform(X)
+    assert empty.shape == full.shape == (3, 8)  # 4 features x 2 channels
+    assert np.allclose(empty, full)

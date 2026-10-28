@@ -100,3 +100,11 @@ def test_time_and_frequency_features_concatenate():
     combined = np.concatenate([time_feat, freq_feat], axis=1)
     assert combined.shape == (5, 11 * 8 + 4 * 8)  # union of both extractors
     assert np.isfinite(combined).all()
+
+
+def test_empty_features_list_means_all():
+    X = np.random.default_rng(0).normal(0, 1, size=(3, 40, 2)).astype(np.float32)
+    full = TimeDomainFeatures().transform(X)
+    empty = TimeDomainFeatures(features=[]).transform(X)
+    assert empty.shape == full.shape == (3, 22)  # 11 features x 2 channels
+    assert np.allclose(empty, full)

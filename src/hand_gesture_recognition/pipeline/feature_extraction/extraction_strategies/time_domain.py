@@ -93,5 +93,5 @@ class TimeDomainFeatures(BaseEstimator, TransformerMixin):
     def transform(self, X: np.ndarray) -> np.ndarray:
         # X: (n_windows, time, channels)
         X = np.asarray(X, dtype=np.float32)
-        names = self.features if self.features is not None else self.FEATURE_NAMES
+        names = self.features or self.FEATURE_NAMES
         return np.concatenate([_COMPUTE[n](X) for n in names], axis=1)

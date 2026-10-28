@@ -131,7 +131,7 @@ class FrequencyDomainFeatures(BaseEstimator, TransformerMixin):
         power = power[:, 1:, :]
         frequencies = frequencies[1:]
 
-        names = self.features if self.features is not None else self.FEATURE_NAMES
+        names = self.features or self.FEATURE_NAMES
         return np.concatenate(
             [_COMPUTE[n](power, frequencies) for n in names], axis=1
         ).astype(np.float32)
