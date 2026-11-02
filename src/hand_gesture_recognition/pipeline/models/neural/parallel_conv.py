@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+from functools import partial
 from typing import Optional, Any, Dict
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from hand_gesture_recognition.pipeline.models.neural.base import ClassifierModule
+from hand_gesture_recognition.pipeline.models.neural.base import (
+    ClassifierModule,
+    InputSpec,
+)
+from hand_gesture_recognition.pipeline.models.neural.datamodule import (
+    EMGDataset,
+    ReshapeToChannelFirstImage,
+    max_small_per_big,
+)
 
 
 class ParallelConvLayer(nn.Module):
@@ -113,3 +122,15 @@ class ParallelConvModule(ClassifierModule):
         x = self.features(x)  # (N, 4*out_channels, H, W)
         x = self.pool(x).flatten(1)  # (N, 4*out_channels)
         return self.head(x)  # (N, n_classes)
+
+    @classmethod
+    def input_spec(cls, windowed, feature_specs) -> InputSpec:
+        # 2D conv consumes (C, H, F): in_channels = EMG channels.
+        n_channels = windowed.train.big.X.shape[-1]
+        builder = partial(
+            EMGDataset.from_grouped,
+            feature_specs=feature_specs,
+            max_small_per_big=max_small_per_big(windowed),
+            transform=ReshapeToChannelFirstImage(n_channels),
+        )
+        return InputSpec(n_channels=n_channels, dataset_builder=builder)

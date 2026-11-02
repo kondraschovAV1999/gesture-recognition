@@ -194,6 +194,9 @@ Built-in neural architectures (select with `neural=<name>`):
 - `cnn` — `CNNModule`: 1-D CNN over the time axis + global pooling.
 - `cnn_lstm` — `CNNLSTMModule`: composite CNN (local temporal features) → LSTM
   (sequence model) → dense head.
+- `cnn_feature_lstm` — `CNNFeatureLSTMModule`: the 2D parallel-conv
+  `FeatureExtractionModule` per small window (sequence folding/unfolding) →
+  flatten → LSTM → dense head. Two-level mode only.
 
 Switch with `neural=dnn` / `neural=lstm` from the CLI.
 
@@ -202,6 +205,15 @@ Switch with `neural=dnn` / `neural=lstm` from the CLI.
 the loss, training/validation/test steps, and optimizer — you only implement
 `forward(x) -> logits`) and add a `configs/neural/<name>.yaml` with its
 `_target_`. The neural runner passes `n_channels` and `n_classes` to the model.
+
+By default the runner feeds a model either raw windows (single-level) or the
+handcrafted-feature sequence `(n_small, F*C)` (two-level). If a model consumes a
+different shape — e.g. the per-channel "images" used by `parallel_conv` and
+`cnn_feature_lstm` — override the `input_spec` classmethod to return an
+`InputSpec(n_channels, dataset_builder, extra_model_kwargs)` describing how to
+build its dataset and any extra constructor args (such as
+`n_features_per_channel`). The runner stays model-agnostic; it just wires the
+returned builder and channel count into the datamodule and constructor.
 
 ## Adding a reporter
 

@@ -1,11 +1,28 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Optional
 
 import torch
 import torch.nn.functional as F
 import torchmetrics
 from lightning.pytorch import LightningModule
+
+
+@dataclass
+class InputSpec:
+    """How to feed a model: its input channel/feature count and dataset builder.
+
+    ``dataset_builder`` maps a single partition (a ``WindowedDataset`` or
+    ``GroupedWindowedDataset``) to a ``torch.utils.data.Dataset``.
+    ``extra_model_kwargs`` carries any additional constructor arguments the
+    model needs beyond ``n_channels``/``n_classes`` (e.g.
+    ``n_features_per_channel``).
+    """
+
+    n_channels: int
+    dataset_builder: Callable
+    extra_model_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
 class ClassifierModule(LightningModule):
@@ -77,3 +94,37 @@ class ClassifierModule(LightningModule):
         # parameter generator).
         opt_partial = instantiate(self.optimizer_config, _partial_=True)
         return opt_partial(self.parameters())
+
+    @classmethod
+    def input_spec(cls, windowed, feature_specs) -> InputSpec:
+        """Describe how this model consumes data.
+
+        The default handles the two generic sequence cases: raw windows
+        (single-level) and handcrafted-feature sequences (two-level). Models
+        that consume a reshaped per-channel "image" override this.
+        """
+        from functools import partial
+
+        from hand_gesture_recognition.configuration.schema import (
+            GroupedWindowedPartitions,
+        )
+        from hand_gesture_recognition.pipeline.models.neural.datamodule import (
+            EMGDataset,
+            compute_n_features,
+            max_small_per_big,
+        )
+
+        if isinstance(windowed, GroupedWindowedPartitions):
+            builder = partial(
+                EMGDataset.from_grouped,
+                feature_specs=feature_specs,
+                max_small_per_big=max_small_per_big(windowed),
+            )
+            return InputSpec(
+                n_channels=compute_n_features(feature_specs, windowed),
+                dataset_builder=builder,
+            )
+        return InputSpec(
+            n_channels=windowed.train.X.shape[-1],
+            dataset_builder=EMGDataset.from_windowed,
+        )

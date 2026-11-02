@@ -244,7 +244,7 @@ Feature names:
 | Field | Values | Default (`neural=lstm`) |
 |---|---|---|
 | `datamodule` | `EMGDataModule` + `batch_size`, `num_workers`, `shuffle` | `batch_size: 32` |
-| `model` | `DNNModule` \| `LSTMModule` \| `CNNModule` \| `CNNLSTMModule` \| `ParallelConvModule` | `LSTMModule` |
+| `model` | `DNNModule` \| `LSTMModule` \| `CNNModule` \| `CNNLSTMModule` \| `ParallelConvModule` \| `CNNFeatureLSTMModule` | `LSTMModule` |
 | `optimizer` | `_target_` (`torch.optim.Adam`/`SGD`/`AdamW`/`RMSprop`) + `lr` | `Adam`, `lr: 0.001` |
 | `early_stopping` | `EarlyStopping` or `null` | `val_loss`, patience 5 |
 | `trainer` | `lightning.pytorch.Trainer` kwargs | `max_epochs: 100`, `accelerator: auto` |
@@ -253,6 +253,13 @@ Select the architecture with `neural=dnn` / `lstm` / `cnn` / `cnn_lstm`.
 
 `parallel_conv` is a 2D parallel-conv feature extractor over the handcrafted
 small-window features, used in two-level mode (`neural=parallel_conv`).
+
+`cnn_feature_lstm` reuses the same parallel-conv feature extractor but treats
+each small window as an independent `(channels, features)` image: a sequence
+folding step merges the small-window axis into the batch, the CNN extracts a
+feature vector per small window, a sequence unfolding step restores the
+sequence, and an LSTM (`hidden_size: 128`) models the temporal relationships.
+Two-level mode only (`neural=cnn_feature_lstm` with `windowing=two_level`).
 
 ### `evaluation`
 

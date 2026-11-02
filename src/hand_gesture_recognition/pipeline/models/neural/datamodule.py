@@ -40,6 +40,48 @@ class ReshapeToChannelFirstImage:
         return x.movedim(-1, -3)  # (..., C, height, F)
 
 
+class ReshapeToChannelFirstSequence:
+    """Reshape feature-major ``(..., S, F*C)`` sequences into ``(..., S, C, F)``.
+
+    Like ``ReshapeToChannelFirstImage``, but keeps the small-window (sequence)
+    axis leading so a CNN+LSTM can fold the sequence into the batch, process
+    each small window ``(C, F)`` independently, then unfold for the LSTM.
+    """
+
+    def __init__(self, n_channels: int):
+        self.n_channels = n_channels
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        *batch_dims, seq, total_features = x.shape
+        f_per_channel = total_features // self.n_channels
+        x = x.reshape(*batch_dims, seq, f_per_channel, self.n_channels)
+        return x.movedim(-1, -2)  # (..., S, C, F)
+
+
+def max_small_per_big(windowed) -> int:
+    """Largest small-window count across all grouped partitions (the sequence
+    length of the handcrafted-feature sequences)."""
+    return max(
+        (
+            len(smalls)
+            for part in ("train", "val", "test")
+            for smalls in getattr(windowed, part).small_windows
+        ),
+        default=1,
+    )
+
+
+def compute_n_features(feature_specs, windowed) -> int:
+    """Number of handcrafted features per small window (F * C), inferred from
+    the first non-empty small window."""
+    features = FeatureExtractor(feature_specs)
+    for part in ("train", "val", "test"):
+        for smalls in getattr(windowed, part).small_windows:
+            if smalls.shape[0] > 0:
+                return int(features.transform(smalls[:1]).shape[1])
+    return 0
+
+
 class EMGDataset(Dataset):
     """Unified dataset for raw windows and grouped handcrafted-feature sequences.
 
