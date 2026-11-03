@@ -12,6 +12,7 @@ from hand_gesture_recognition.utils.observability.logging import get_logger
 from hand_gesture_recognition.utils.paths import resolve_path
 from hand_gesture_recognition.runner.pipeline import PipelineBuilder
 from hand_gesture_recognition.utils.observability.tracking import MlflowTracker
+from hand_gesture_recognition.utils.observability.tracking import is_primary_process
 
 
 class ExperimentRunner:
@@ -35,10 +36,11 @@ class ExperimentRunner:
     def run(self) -> EvaluationResult:
         cfg = self.cfg
         self.tracker.start(cfg.run_id)
-        if cfg.backend == "classical":
-            mlflow.sklearn.autolog()
-        else:
-            mlflow.pytorch.autolog()
+        if is_primary_process():
+            if cfg.backend == "classical":
+                mlflow.sklearn.autolog()
+            else:
+                mlflow.pytorch.autolog()
         try:
             pipeline = PipelineBuilder(
                 cfg, self.logger, self.tracker, self.output_root
