@@ -4,7 +4,10 @@ import pytest
 
 from hand_gesture_recognition.configuration.schema import TrackingConfig
 from hand_gesture_recognition.configuration.schema import EvaluationResult
-from hand_gesture_recognition.utils.observability.tracking import MlflowTracker
+from hand_gesture_recognition.utils.observability.tracking import (
+    MlflowTracker,
+    is_primary_process,
+)
 
 
 def test_tracker_logs_params_and_metrics(tmp_path):
@@ -83,3 +86,79 @@ def test_log_confusion_matrix_empty_skips(tmp_path):
     artifacts = [a.path for a in client.list_artifacts(t.run_id)]
     assert "confusion_matrix_train.png" not in artifacts
     assert "confusion_matrix_train_normalized.png" not in artifacts
+
+
+def test_is_primary_process_defaults_true(monkeypatch):
+    for var in (
+        "RANK",
+        "LOCAL_RANK",
+        "OMPI_COMM_WORLD_RANK",
+        "SLURM_PROCID",
+        "SLURM_ARRAY_TASK_ID",
+        "SLURM_ARRAY_TASK_MIN",
+    ):
+        monkeypatch.delenv(var, raising=False)
+    assert is_primary_process() is True
+
+
+def test_is_primary_process_rank_gated(monkeypatch):
+    monkeypatch.setenv("RANK", "1")
+    assert is_primary_process() is False
+    monkeypatch.setenv("RANK", "0")
+    assert is_primary_process() is True
+
+
+def test_is_primary_process_slurm_procid(monkeypatch):
+    for var in ("RANK", "LOCAL_RANK", "OMPI_COMM_WORLD_RANK", "SLURM_ARRAY_TASK_ID"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("SLURM_PROCID", "1")
+    assert is_primary_process() is False
+    monkeypatch.setenv("SLURM_PROCID", "0")
+    assert is_primary_process() is True
+
+
+def test_is_primary_process_slurm_array(monkeypatch):
+    for var in ("RANK", "LOCAL_RANK", "OMPI_COMM_WORLD_RANK"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("SLURM_PROCID", "0")  # every array task sees procid 0
+    monkeypatch.setenv("SLURM_ARRAY_TASK_MIN", "0")
+    monkeypatch.setenv("SLURM_ARRAY_TASK_ID", "2")
+    assert is_primary_process() is False
+    monkeypatch.setenv("SLURM_ARRAY_TASK_ID", "0")
+    assert is_primary_process() is True
+
+
+def test_is_primary_process_slurm_array_1based(monkeypatch):
+    for var in ("RANK", "LOCAL_RANK", "OMPI_COMM_WORLD_RANK"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("SLURM_PROCID", "0")
+    monkeypatch.setenv("SLURM_ARRAY_TASK_MIN", "1")
+    monkeypatch.setenv("SLURM_ARRAY_TASK_ID", "3")
+    assert is_primary_process() is False
+    monkeypatch.setenv("SLURM_ARRAY_TASK_ID", "1")
+    assert is_primary_process() is True
+
+
+def test_non_primary_rank_skips_all_writes(tmp_path, monkeypatch):
+    monkeypatch.setenv("RANK", "1")
+    cfg = TrackingConfig(tracking_uri=str(tmp_path / "mlruns"), experiment_name="t")
+    t = MlflowTracker(cfg)
+    t.start("run-np")
+    assert t.run_id is None
+    t.log_params({"seed": 42})
+    t.log_metrics({"accuracy": 0.9})
+    t.finish("FINISHED")
+    client = mlflow.tracking.MlflowClient(tracking_uri=str(tmp_path / "mlruns"))
+    # The non-primary process must not create the experiment or any run.
+    assert client.get_experiment_by_name("t") is None
+
+
+def test_dedupe_metrics_skips_exact_duplicate(tmp_path):
+    cfg = TrackingConfig(tracking_uri=str(tmp_path / "mlruns"), experiment_name="t")
+    t = MlflowTracker(cfg)
+    # Simulate the aggregate already having been logged once this run.
+    t._logged_metrics.add(("accuracy", 0.9))
+    remaining = t._dedupe_metrics({"accuracy": 0.9, "f1": 0.8})
+    assert remaining == {"f1": 0.8}
+    # A genuinely new value for the same key is still logged.
+    assert t._dedupe_metrics({"accuracy": 0.95}) == {"accuracy": 0.95}
