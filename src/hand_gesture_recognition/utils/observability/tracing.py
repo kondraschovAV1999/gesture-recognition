@@ -11,6 +11,12 @@ def _log_metric_to_mlflow(name: str, value: float) -> None:
     try:
         import mlflow
 
+        from hand_gesture_recognition.utils.observability.tracking import (
+            is_primary_process,
+        )
+
+        if not is_primary_process():
+            return
         if mlflow.active_run():
             mlflow.log_metric(f"stage_{name}_seconds", value)
     except Exception:
